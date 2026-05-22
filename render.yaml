@@ -1,0 +1,60 @@
+services:
+  - type: web
+    name: global-broker-ai-v2
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm run start:prod
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: 10000
+      - key: CFD_PAPER_AGENT_AUTOSTART
+        value: true
+      - key: APP_BASIC_AUTH_USER
+        value: admin
+      - key: APP_BASIC_AUTH_PASSWORD
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: CFD_RESEARCH_ENABLED
+        value: true
+      - key: CFD_RESEARCH_MODEL
+        value: gpt-5.5
+      - key: CFD_RESEARCH_WEB_SEARCH_ENABLED
+        value: true
+      - key: CFD_RESEARCH_INTERVAL_MINUTES
+        value: 30
+      - key: REAL_TRADING_ALLOWED
+        value: false
+      - key: BROKER_EXECUTION_ENABLED
+        value: false
+      - key: LIVE_TRADING_ENABLED
+        value: false
+      - key: MT5_REAL_EXECUTION
+        value: false
+      - key: VT_MARKETS_ENABLED
+        value: false
+      - key: VT_MARKETS_MODE
+        value: DEMO
+      - key: VT_MARKETS_ACCOUNT_TYPE
+        value: MT5_DEMO
+      - key: VT_MARKETS_ALLOW_ORDER_SEND
+        value: false
+      - key: VT_MARKETS_REAL_TRADING_ALLOWED
+        value: false
+      - key: VT_MARKETS_READ_ONLY
+        value: true
+      - key: MT5_BRIDGE_URL
+        value: http://127.0.0.1:5190
+      - key: MICRO_PROFIT_TARGET_NET_USD
+        value: 2.00
+      - key: MICRO_PROFIT_TARGET_OPTIONS_USD
+        value: 1.00,2.00,3.00
+      - key: MICRO_PROFIT_DEFAULT_TARGET_USD
+        value: 2.00
+      - key: MICRO_PROFIT_MAX_LOSS_PER_TRADE_USD
+        value: 10.00
+      - key: MICRO_PROFIT_DAILY_STOP_LOSS_USD
+        value: 25.00
