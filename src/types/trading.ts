@@ -66,6 +66,7 @@ export type CfdPaperStatus = {
   leverageDamage: LeverageDamageStatus
   adaptiveLearning: AdaptiveLearningStatus
   cfdResearchLearning: CfdResearchLearningStatus
+  learningCampaign: LearningCampaignStatus
   cfdTraderSkill: CfdTraderSkillStatus
   traderDecision: TraderDecisionStatus
   vtMarkets: {
@@ -289,6 +290,46 @@ export type CfdResearchLearningStatus = {
     brokerExecutionEnabled: false
   }
   error?: string
+}
+
+export type LearningCampaignStatus = {
+  enabled: boolean
+  mode: 'WEEKEND_SHADOW_LEARNING_CAMPAIGN'
+  targetSamples: number
+  completedSamples: number
+  openSamples: number
+  remainingSamples: number
+  progressPercent: number
+  maxConcurrentSamples: number
+  targetNetUsd: number
+  maxLossUsd: number
+  netPnl: number
+  wins: number
+  losses: number
+  targetHits: number
+  winRate: number
+  averageHoldSeconds: number | null
+  startedAt: string
+  lastUpdatedAt: string
+  lastDecision: string
+  recentSamples: Array<{
+    cfdSymbol: string
+    direction: 'LONG' | 'SHORT'
+    exitReason: string
+    holdSeconds: number
+    netPnl: number
+    score: number
+    source: string
+    strategy: string
+  }>
+  safety: {
+    shadowOnly: true
+    affectsMainBalance: false
+    affectsMainMargin: false
+    sendsOrders: false
+    realTradingAllowed: false
+    brokerExecutionEnabled: false
+  }
 }
 
 export type MicroProfitStatus = {

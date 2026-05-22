@@ -6,6 +6,7 @@ import { buildAdaptiveLearning } from './adaptiveLearningEngine.js'
 import { buildLossAttribution } from './lossAttributionEngine.js'
 import { buildTargetFeasibility } from './targetFeasibilityAnalyzer.js'
 import { buildLeverageDamage } from './leverageDamageAnalyzer.js'
+import { getWeekendLearningCampaignStatus } from '../learning/weekendLearningCampaign.js'
 
 export type ResearchLearningRuleProposal = {
   confidence: 'LOW' | 'MEDIUM' | 'HIGH'
@@ -180,6 +181,7 @@ function buildResearchContext() {
       lossAttribution: buildLossAttribution(),
       targetFeasibility: buildTargetFeasibility(),
       leverageDamage: buildLeverageDamage(),
+      weekendShadowLearningCampaign: getWeekendLearningCampaignStatus(),
       bySymbol: summarizeBy(todayClosed, (trade) => trade.cfdSymbol),
       byStrategy: summarizeBy(todayClosed, (trade) => trade.strategy),
       byCandlePattern: summarizeBy(todayClosed, (trade) => trade.candlePatternAtEntry ?? 'UNKNOWN_CANDLE'),

@@ -13,6 +13,7 @@ import { getLastCfdExpertEvaluation } from '../cfd/cfdExpertAgent.js'
 import { getFeedStatuses } from '../feeds/livePriceService.js'
 import { buildAdaptiveLearning } from '../performance/adaptiveLearningEngine.js'
 import { getCfdResearchLearningStatus, maybeRunCfdResearchLearning, runCfdResearchLearningNow } from '../performance/cfdResearchLearningAgent.js'
+import { getWeekendLearningCampaignStatus, updateWeekendLearningCampaign } from '../learning/weekendLearningCampaign.js'
 import { buildAgentEffectiveness } from '../performance/agentEffectivenessEngine.js'
 import { buildLeverageDamage } from '../performance/leverageDamageAnalyzer.js'
 import { buildLossAttribution } from '../performance/lossAttributionEngine.js'
@@ -323,6 +324,15 @@ async function evaluateAgentCycle() {
   const scan = await scanGlobalOpportunities()
   lastOpportunities = scan.opportunities
   lastBlocked = scan.blocked
+  const learningCampaignEvents = await updateWeekendLearningCampaign(scan.opportunities)
+  for (const event of learningCampaignEvents) pushActivity(event)
+  if (learningCampaignEvents.length) {
+    const campaign = getWeekendLearningCampaignStatus()
+    pushActivity({
+      action: 'LEARNING_CAMPAIGN_PROGRESS',
+      reason: `Campana shadow ${campaign.completedSamples}/${campaign.targetSamples}; abiertas ${campaign.openSamples}; no afecta balance ni margen.`,
+    })
+  }
   effectiveness = buildAgentEffectiveness({ account, activityFeed, blockedOpportunities: lastBlocked, openPositions: getOpenPositions() })
   const best = scan.opportunities[0]
   const rotation = reviewOpenPositions({ account, accountHealth: health.accountHealth, opportunities: scan.opportunities, positions: getOpenPositions() })
@@ -525,6 +535,7 @@ async function statusPayload() {
   const leverageDamage = buildLeverageDamage()
   const adaptiveLearning = buildAdaptiveLearning()
   const cfdResearchLearning = getCfdResearchLearningStatus()
+  const learningCampaign = getWeekendLearningCampaignStatus()
   const cfdTraderSkill = buildCfdTraderSkillReadout({
     account,
     actionsTaken: lastTraderSkillActionsTaken,
@@ -614,6 +625,7 @@ async function statusPayload() {
     leverageDamage,
     adaptiveLearning,
     cfdResearchLearning,
+    learningCampaign,
     cfdTraderSkill,
     traderDecision,
     vtMarkets: {

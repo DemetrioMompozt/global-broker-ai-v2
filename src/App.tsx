@@ -20,6 +20,7 @@ import { DefensiveDiagnosticMode } from './components/dashboard/DefensiveDiagnos
 import { LossAttributionPanel } from './components/dashboard/LossAttributionPanel'
 import { AgentLearningPanel } from './components/dashboard/AgentLearningPanel'
 import { CFDResearchLearningPanel } from './components/dashboard/CFDResearchLearningPanel'
+import { LearningCampaignMonitor } from './components/dashboard/LearningCampaignMonitor'
 
 export default function App() {
   const { status, error, lastRefresh, refresh } = useAutonomousStatus()
@@ -41,6 +42,7 @@ export default function App() {
       <DefensiveDiagnosticMode diagnostic={status.defensiveDiagnostic} onRefresh={refresh} />
       <AgentLearningPanel learning={status.adaptiveLearning} />
       <CFDResearchLearningPanel learning={status.cfdResearchLearning} onRefresh={refresh} />
+      <LearningCampaignMonitor campaign={status.learningCampaign} />
       <LossAttributionPanel attribution={status.lossAttribution} leverage={status.leverageDamage} target={status.targetFeasibility} />
       <CFDTraderSkillPanel skill={status.cfdTraderSkill} />
       <TraderDecisionEngine decision={status.traderDecision} />
