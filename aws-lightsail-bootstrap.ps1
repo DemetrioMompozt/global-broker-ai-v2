@@ -17,6 +17,25 @@ Write-Host "=========================================="
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 Set-ExecutionPolicy Bypass -Scope Process -Force
 
+Write-Host "Habilitando acceso de diagnostico seguro del servidor..."
+try {
+  Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
+  Start-Service sshd
+  Set-Service -Name sshd -StartupType Automatic
+  New-NetFirewallRule -DisplayName "Global Broker AI SSH Diagnostic" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 22 -ErrorAction SilentlyContinue | Out-Null
+} catch {
+  Write-Host "OpenSSH no pudo habilitarse automaticamente: $($_.Exception.Message)"
+}
+
+try {
+  Enable-PSRemoting -Force
+  Set-Item WSMan:\localhost\Service\AllowUnencrypted -Value true -ErrorAction SilentlyContinue
+  Set-Item WSMan:\localhost\Service\Auth\Basic -Value true -ErrorAction SilentlyContinue
+  New-NetFirewallRule -DisplayName "Global Broker AI WinRM Diagnostic" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5985 -ErrorAction SilentlyContinue | Out-Null
+} catch {
+  Write-Host "WinRM no pudo habilitarse automaticamente: $($_.Exception.Message)"
+}
+
 function Refresh-Path {
   $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
   $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
