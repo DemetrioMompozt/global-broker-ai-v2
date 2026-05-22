@@ -74,6 +74,27 @@ Ejecuta:
 GlobalBrokerAI-PM2-Install.bat
 ```
 
+## Instalacion completa en Windows VPS
+
+Para replicar el entorno local lo mas cerca posible, usa:
+
+```bat
+GlobalBrokerAI-WindowsVPS-Install.bat
+```
+
+Ese instalador:
+
+- verifica Node.js;
+- verifica Python;
+- instala dependencias;
+- compila la app;
+- instala dependencias del MT5 bridge;
+- crea `.env` y `mt5-bridge/.env` desde ejemplos si faltan;
+- instala PM2;
+- arranca la API/UI con PM2.
+
+Despues debes abrir MetaTrader 5 en el VPS, iniciar sesion DEMO de VT Markets y ejecutar `GlobalBrokerAI-Connector.bat`.
+
 Comandos utiles:
 
 ```bat
