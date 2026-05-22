@@ -165,6 +165,43 @@ pm2 delete all 2>$null
 pm2 start ecosystem.config.cjs
 pm2 save
 
+Write-Host "Registrando tareas persistentes de Windows para modo 24/7..."
+try {
+  Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match "server/app.js" -or $_.CommandLine -match "mt5_bridge.py" } | ForEach-Object {
+    Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+  }
+
+  $ApiAction = New-ScheduledTaskAction `
+    -Execute (Join-Path $env:ProgramFiles "nodejs\node.exe") `
+    -Argument "server/app.js" `
+    -WorkingDirectory $Project
+
+  $BridgeAction = New-ScheduledTaskAction `
+    -Execute "C:\Python314\python.exe" `
+    -Argument "mt5_bridge.py" `
+    -WorkingDirectory (Join-Path $Project "mt5-bridge")
+
+  $Trigger = New-ScheduledTaskTrigger -AtStartup
+  $Settings = New-ScheduledTaskSettingsSet `
+    -AllowStartIfOnBatteries `
+    -DontStopIfGoingOnBatteries `
+    -RestartCount 999 `
+    -RestartInterval (New-TimeSpan -Minutes 1) `
+    -ExecutionTimeLimit (New-TimeSpan -Days 365)
+
+  Unregister-ScheduledTask -TaskName "GlobalBrokerAI-v2-API" -Confirm:$false -ErrorAction SilentlyContinue
+  Unregister-ScheduledTask -TaskName "GlobalBrokerAI-v2-MT5-Bridge" -Confirm:$false -ErrorAction SilentlyContinue
+
+  Register-ScheduledTask -TaskName "GlobalBrokerAI-v2-API" -Action $ApiAction -Trigger $Trigger -Settings $Settings -User "Administrator" -RunLevel Highest | Out-Null
+  Register-ScheduledTask -TaskName "GlobalBrokerAI-v2-MT5-Bridge" -Action $BridgeAction -Trigger $Trigger -Settings $Settings -User "Administrator" -RunLevel Highest | Out-Null
+
+  Start-ScheduledTask -TaskName "GlobalBrokerAI-v2-API"
+  Start-ScheduledTask -TaskName "GlobalBrokerAI-v2-MT5-Bridge"
+} catch {
+  Write-Host "No se pudieron registrar tareas persistentes automaticamente: $($_.Exception.Message)"
+  Write-Host "PM2 queda como respaldo."
+}
+
 Write-Host "Creando archivo de acceso en escritorio..."
 $Access = @"
 Global Broker AI v2 esta instalado.

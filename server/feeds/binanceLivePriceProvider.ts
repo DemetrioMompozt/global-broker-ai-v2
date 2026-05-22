@@ -9,22 +9,32 @@ export type BinanceLivePrice = {
   previousPrice: number
   change: number
   changePercent: number
-  provider: 'Binance'
+  provider: 'Binance' | 'Binance.US'
   feedType: 'REALTIME_TICK'
   lastPriceUpdate: string
   connected: boolean
 }
 
 const symbols = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT']
+const streamHosts = ['stream.binance.com:9443', 'stream.binance.us:9443'] as const
 const prices = new Map<string, BinanceLivePrice>()
 let socket: WebSocket | undefined
 let status: ProviderStatus = 'DISCONNECTED'
 let started = false
 let reconnectTimer: NodeJS.Timeout | undefined
 let lastError: string | null = null
+let hostIndex = 0
+
+function activeHost() {
+  return streamHosts[hostIndex] ?? streamHosts[0]
+}
+
+function activeProvider(): 'Binance' | 'Binance.US' {
+  return activeHost().includes('binance.us') ? 'Binance.US' : 'Binance'
+}
 
 function streamUrl() {
-  return `wss://stream.binance.com:9443/stream?streams=${symbols.map((s) => `${s.toLowerCase()}@trade`).join('/')}`
+  return `wss://${activeHost()}/stream?streams=${symbols.map((s) => `${s.toLowerCase()}@trade`).join('/')}`
 }
 
 function update(symbol: string, rawPrice: string | number | undefined, rawQuantity?: string | number, time?: number) {
@@ -38,7 +48,7 @@ function update(symbol: string, rawPrice: string | number | undefined, rawQuanti
     previousPrice: previous,
     change: Number((price - previous).toFixed(8)),
     changePercent: previous > 0 ? Number(((price / previous - 1) * 100).toFixed(6)) : 0,
-    provider: 'Binance',
+    provider: activeProvider(),
     feedType: 'REALTIME_TICK',
     lastPriceUpdate: new Date().toISOString(),
     connected: status === 'CONNECTED',
@@ -62,7 +72,7 @@ function connect() {
     socket.addEventListener('open', () => {
       status = 'CONNECTED'
       lastError = null
-      console.log('[v2:binance] connected', symbols.join(','))
+      console.log(`[v2:binance] connected via ${activeProvider()}`, symbols.join(','))
     })
     socket.addEventListener('message', (event) => {
       try {
@@ -78,12 +88,15 @@ function connect() {
     })
     socket.addEventListener('error', () => {
       status = 'ERROR'
-      lastError = 'Binance WebSocket error'
+      const failedProvider = activeProvider()
+      lastError = `${failedProvider} WebSocket error`
+      hostIndex = (hostIndex + 1) % streamHosts.length
       reconnect()
     })
   } catch (error) {
     status = 'ERROR'
     lastError = error instanceof Error ? error.message : String(error)
+    hostIndex = (hostIndex + 1) % streamHosts.length
     reconnect()
   }
 }
@@ -112,6 +125,8 @@ export function getBinanceStatus() {
     status,
     lastError,
     lastUpdate: [...prices.values()].map((p) => p.lastPriceUpdate).sort().at(-1) ?? null,
+    provider: activeProvider(),
+    endpoint: activeHost(),
     symbols,
   }
 }

@@ -15,11 +15,21 @@ function previousParts(asset: string, price: number, explicitPrevious?: number) 
 }
 
 async function binanceRest(symbol: string) {
-  const response = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${encodeURIComponent(symbol)}`)
-  if (!response.ok) return null
-  const payload = await response.json() as { price?: string }
-  const price = Number(payload.price)
-  return Number.isFinite(price) && price > 0 ? price : null
+  for (const provider of [
+    { name: 'Binance REST', url: 'https://api.binance.com/api/v3/ticker/price' },
+    { name: 'Binance.US REST', url: 'https://api.binance.us/api/v3/ticker/price' },
+  ]) {
+    try {
+      const response = await fetch(`${provider.url}?symbol=${encodeURIComponent(symbol)}`)
+      if (!response.ok) continue
+      const payload = await response.json() as { price?: string }
+      const price = Number(payload.price)
+      if (Number.isFinite(price) && price > 0) return { price, provider: provider.name }
+    } catch {
+      // Try the next public endpoint.
+    }
+  }
+  return null
 }
 
 export async function getLivePrice(asset: string): Promise<LivePrice> {
@@ -35,33 +45,33 @@ export async function getLivePrice(asset: string): Promise<LivePrice> {
         previousPrice: parts.previousPrice,
         change: parts.change,
         changePercent: parts.changePercent,
-        provider: 'Binance',
+        provider: tick.provider,
         feedType: 'REALTIME_TICK',
         lastPriceUpdate: tick.lastPriceUpdate,
         isDynamicPriceAvailable: true,
         validForPaperPositionTracking: true,
         validForScalping: false,
-        message: `${mapping.originalAsset} usa Binance WebSocket publico (${mapping.mappedSymbol}). Paper only.`,
+        message: `${mapping.originalAsset} usa ${tick.provider} WebSocket publico (${mapping.mappedSymbol}). Paper only.`,
       }
     }
     try {
       const restPrice = await binanceRest(mapping.mappedSymbol)
       if (restPrice) {
-        const parts = previousParts(mapping.originalAsset, restPrice)
+        const parts = previousParts(mapping.originalAsset, restPrice.price)
         return {
           asset: mapping.originalAsset,
           mappedSymbol: mapping.mappedSymbol,
-          price: restPrice,
+          price: restPrice.price,
           previousPrice: parts.previousPrice,
           change: parts.change,
           changePercent: parts.changePercent,
-          provider: 'Binance REST',
+          provider: restPrice.provider,
           feedType: 'DELAYED_INTRADAY',
           lastPriceUpdate: new Date().toISOString(),
           isDynamicPriceAvailable: true,
           validForPaperPositionTracking: true,
           validForScalping: false,
-          message: 'Binance REST fallback publico mientras llegan ticks WebSocket. No scalping.',
+          message: `${restPrice.provider} fallback publico mientras llegan ticks WebSocket. No scalping.`,
         }
       }
     } catch {
