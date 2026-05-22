@@ -27,6 +27,8 @@ MT5_ALLOW_ORDER_SEND=false
 MT5_REAL_TRADING_ALLOWED=false
 MT5_HOST=127.0.0.1
 MT5_PORT=5190
+# Optional on servers with a specific MT5 terminal install path:
+MT5_TERMINAL_PATH=
 ```
 
 6. Ejecuta:
@@ -60,6 +62,8 @@ MT5_ALLOW_ORDER_SEND=false
 MT5_REAL_TRADING_ALLOWED=false
 MT5_HOST=127.0.0.1
 MT5_PORT=5190
+# Optional on servers with a specific MT5 terminal install path:
+MT5_TERMINAL_PATH=
 ```
 
 7. Ejecuta:

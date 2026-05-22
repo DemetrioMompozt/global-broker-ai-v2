@@ -88,12 +88,16 @@ def initialize_mt5():
     login = os.getenv("MT5_LOGIN")
     password = os.getenv("MT5_PASSWORD")
     server = os.getenv("MT5_SERVER")
+    terminal_path = os.getenv("MT5_TERMINAL_PATH")
 
     try:
+        kwargs = {}
+        if terminal_path:
+            kwargs["path"] = terminal_path
         if login and password and server:
-            ok = mt5.initialize(login=int(login), password=password, server=server)
+            ok = mt5.initialize(login=int(login), password=password, server=server, **kwargs)
         else:
-            ok = mt5.initialize()
+            ok = mt5.initialize(**kwargs)
     except Exception as exc:
         return False, str(exc)
 
