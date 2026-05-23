@@ -1,7 +1,10 @@
 import type { BridgeEnvCheck, CfdPaperStatus, CfdResearchLearningStatus, MicroProfitStatus, SaveBridgeEnvResponse, VtAccount, VtMappingResponse, VtMarketsConnectionWizardResult, VtSetupDiagnostics, VtSymbolsResponse, VtTickResponse } from '../types/trading'
 
 async function request<T>(path: string, options?: RequestInit) {
-  const response = await fetch(`${path}${path.includes('?') ? '&' : '?'}t=${Date.now()}`, {
+  const cleanBase = typeof window === 'undefined' ? 'http://127.0.0.1' : `${window.location.protocol}//${window.location.host}`
+  const url = new URL(path, cleanBase)
+  url.searchParams.set('t', String(Date.now()))
+  const response = await fetch(url.toString(), {
     ...options,
     cache: 'no-store',
     headers: {
