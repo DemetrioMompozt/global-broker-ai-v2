@@ -58,7 +58,7 @@ const model = process.env.CFD_RESEARCH_MODEL ?? 'gpt-5.5'
 const enabled = boolEnv('CFD_RESEARCH_ENABLED', true)
 const webSearchEnabled = boolEnv('CFD_RESEARCH_WEB_SEARCH_ENABLED', true)
 const intervalMinutes = Math.max(5, numEnv('CFD_RESEARCH_INTERVAL_MINUTES', 30))
-const timeoutMs = Math.max(5_000, numEnv('CFD_RESEARCH_TIMEOUT_MS', 45_000))
+const timeoutMs = Math.max(5_000, numEnv('CFD_RESEARCH_TIMEOUT_MS', 120_000))
 
 let lastStatus: ResearchLearningStatus = buildBaseStatus()
 let running: Promise<ResearchLearningStatus> | null = null
@@ -250,7 +250,7 @@ function normalizeRuleProposals(value: unknown): ResearchLearningRuleProposal[] 
   })
 }
 
-async function requestOpenAiResearch(trigger: string) {
+async function postOpenAiResearch(trigger: string, useWebSearch: boolean) {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
   try {
@@ -267,8 +267,8 @@ async function requestOpenAiResearch(trigger: string) {
         },
       ],
       reasoning: { effort: process.env.CFD_RESEARCH_REASONING_EFFORT ?? 'medium' },
-      tools: webSearchEnabled ? [{ type: 'web_search_preview' }] : undefined,
-      tool_choice: webSearchEnabled ? 'auto' : undefined,
+      tools: useWebSearch ? [{ type: 'web_search_preview' }] : undefined,
+      tool_choice: useWebSearch ? 'auto' : undefined,
     }
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
@@ -300,6 +300,18 @@ async function requestOpenAiResearch(trigger: string) {
     })
   } finally {
     clearTimeout(timeout)
+  }
+}
+
+async function requestOpenAiResearch(trigger: string) {
+  try {
+    return await postOpenAiResearch(trigger, webSearchEnabled)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (webSearchEnabled && message.toLowerCase().includes('abort')) {
+      return postOpenAiResearch(`${trigger}-no-web-fallback`, false)
+    }
+    throw error
   }
 }
 

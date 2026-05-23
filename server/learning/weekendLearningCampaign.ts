@@ -115,7 +115,7 @@ function sampleMoveBps(assetClass: string) {
   if (assetClass === 'FOREX_CFD') return 3
   if (assetClass === 'INDEX_CFD') return 4.5
   if (assetClass === 'METAL_CFD') return 5
-  if (assetClass === 'CRYPTO_CFD') return 9
+  if (assetClass === 'CRYPTO_CFD') return 40
   return 8
 }
 
