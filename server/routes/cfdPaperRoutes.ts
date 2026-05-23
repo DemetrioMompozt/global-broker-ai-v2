@@ -447,6 +447,14 @@ async function evaluateAgentCycle() {
         ? { decision: 'MANAGE', reason: 'Modo recovery: no hay entrada sniper suficientemente fuerte; gestionar abiertas y evitar repetir patron perdedor.', symbol: best.cfdSymbol }
         : { decision: 'MANAGE', reason: 'Todos los setups aprobados ya tienen posicion abierta; gestionar sin duplicar ni contaminar el monitor con bloqueos falsos.', symbol: best.cfdSymbol }
       pushActivity({ action: 'MANAGE_EXISTING_POSITIONS', reason: String(lastDecision.reason) })
+    } else if (!candidates.length) {
+      attemptedOrBlocked = true
+      const confirmedCount = scan.opportunities.filter((opportunity) => opportunity.setupConfirmed).length
+      const reason = confirmedCount
+        ? `Agente corriendo, pero ninguna oportunidad confirmada supera todos los filtros de recovery/trader gate. Mejor lectura: ${best.cfdSymbol} ${best.setupStatus}, score ${best.opportunityScore.toFixed(0)}, CFD ${(best.cfdExpertScore ?? 0).toFixed(0)}.`
+        : `Agente corriendo y escaneando; todavia no hay setup CONFIRMED. Mejor lectura: ${best.cfdSymbol} ${best.setupStatus}, score ${best.opportunityScore.toFixed(0)}, CFD ${(best.cfdExpertScore ?? 0).toFixed(0)}.`
+      lastDecision = { decision: 'WAIT_FOR_CONFIRMED_SETUP', reason, symbol: best.cfdSymbol }
+      pushActivity({ action: 'WAIT_FOR_CONFIRMED_SETUP', symbol: best.cfdSymbol, reason })
     }
     for (const opportunity of candidates) {
       account = accountSnapshot()

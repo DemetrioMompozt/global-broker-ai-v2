@@ -8,6 +8,9 @@ export function HeroAgentStatus({ status, onRefresh }: { status: CfdPaperStatus;
   const vtConnected = status.sources?.vtMarkets.status === 'CONNECTED_DEMO_READ_ONLY' || status.vtMarkets.status === 'CONNECTED_DEMO_READ_ONLY'
   const diagnosticActive = status.defensiveDiagnostic?.active
   const workerRunning = status.agent.workerRunning
+  const campaignDone = status.learningCampaign?.enabled && status.learningCampaign.completedSamples >= status.learningCampaign.targetSamples
+  const lastDecision = typeof status.agent.lastDecision?.decision === 'string' ? status.agent.lastDecision.decision : ''
+  const lastDecisionReason = typeof status.agent.lastDecision?.reason === 'string' ? status.agent.lastDecision.reason : ''
   const title = diagnosticActive ? 'Modo diagnostico defensivo' : openCount > 0 ? 'Gestionando posiciones CFD paper' : 'Buscando oportunidades CFD'
   const subtitle = diagnosticActive
     ? 'Nuevas entradas bloqueadas. El agente gestiona posiciones abiertas y analiza por que el sistema esta perdiendo.'
@@ -28,8 +31,13 @@ export function HeroAgentStatus({ status, onRefresh }: { status: CfdPaperStatus;
         <div className="tag-row">
           <span className={workerRunning ? 'badge badge-good' : 'badge badge-bad'}>Agente: {workerRunning ? 'corriendo' : 'detenido'}</span>
           <span className="badge badge-neutral">Estado: {status.agent.status}</span>
-          {status.learningCampaign?.enabled ? <span className="badge badge-good">Learning: {status.learningCampaign.completedSamples}/{status.learningCampaign.targetSamples}</span> : null}
+          {status.learningCampaign?.enabled ? <span className={campaignDone ? 'badge badge-neutral' : 'badge badge-good'}>Learning: {status.learningCampaign.completedSamples}/{status.learningCampaign.targetSamples}</span> : null}
         </div>
+        {workerRunning && lastDecisionReason ? (
+          <p className="notice">
+            {lastDecision}: {lastDecisionReason}
+          </p>
+        ) : null}
         <p className="muted">
           Ultima evaluacion: {status.agent.lastEvaluationAt ? new Date(status.agent.lastEvaluationAt).toLocaleTimeString() : 'pendiente'} · Proxima: {status.agent.nextEvaluationAt ? new Date(status.agent.nextEvaluationAt).toLocaleTimeString() : 'pendiente'}
         </p>

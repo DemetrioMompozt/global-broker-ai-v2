@@ -230,6 +230,17 @@ function closeSample(position: ShadowPosition, exitPrice: number, exitReason: Sh
 function openNewSamples(opportunities: Opportunity[]) {
   const events: LearningCampaignEvent[] = []
   const completed = state.closedSamples.length
+  if (completed >= weekendLearningCampaignConfig.targetSamples) {
+    if (state.openSamples.length) {
+      const canceled = state.openSamples.length
+      state.openSamples = []
+      events.push({
+        action: 'LEARNING_CAMPAIGN_TARGET_REACHED',
+        reason: `Campana shadow completada. Se cancelaron ${canceled} muestras abiertas para no exceder el objetivo de ${weekendLearningCampaignConfig.targetSamples}.`,
+      })
+    }
+    return events
+  }
   const slots = Math.min(
     weekendLearningCampaignConfig.maxConcurrentSamples - state.openSamples.length,
     weekendLearningCampaignConfig.targetSamples - completed,
@@ -259,7 +270,35 @@ function openNewSamples(opportunities: Opportunity[]) {
 export async function updateWeekendLearningCampaign(opportunities: Opportunity[]) {
   const events: LearningCampaignEvent[] = []
   if (!weekendLearningCampaignConfig.enabled) return events
+  if (state.closedSamples.length >= weekendLearningCampaignConfig.targetSamples) {
+    if (state.openSamples.length) {
+      const canceled = state.openSamples.length
+      state.openSamples = []
+      events.push({
+        action: 'LEARNING_CAMPAIGN_TARGET_REACHED',
+        reason: `Campana shadow completada. Se cancelaron ${canceled} muestras abiertas para no exceder el objetivo de ${weekendLearningCampaignConfig.targetSamples}.`,
+      })
+    }
+    state.lastUpdatedAt = new Date().toISOString()
+    state.lastDecision = `Objetivo completado: ${weekendLearningCampaignConfig.targetSamples}/${weekendLearningCampaignConfig.targetSamples} muestras.`
+    saveState()
+    return events
+  }
   events.push(...await updateOpenSamples())
+  if (state.closedSamples.length >= weekendLearningCampaignConfig.targetSamples) {
+    if (state.openSamples.length) {
+      const canceled = state.openSamples.length
+      state.openSamples = []
+      events.push({
+        action: 'LEARNING_CAMPAIGN_TARGET_REACHED',
+        reason: `Campana shadow completada. Se cancelaron ${canceled} muestras abiertas para no exceder el objetivo de ${weekendLearningCampaignConfig.targetSamples}.`,
+      })
+    }
+    state.lastUpdatedAt = new Date().toISOString()
+    state.lastDecision = `Objetivo completado: ${weekendLearningCampaignConfig.targetSamples}/${weekendLearningCampaignConfig.targetSamples} muestras.`
+    saveState()
+    return events
+  }
   if (state.closedSamples.length < weekendLearningCampaignConfig.targetSamples) {
     events.push(...openNewSamples(opportunities))
   }
@@ -273,6 +312,7 @@ export async function updateWeekendLearningCampaign(opportunities: Opportunity[]
 
 export function getWeekendLearningCampaignStatus() {
   const closed = state.closedSamples
+  const completedSamples = Math.min(closed.length, weekendLearningCampaignConfig.targetSamples)
   const wins = closed.filter((item) => item.netPnl > 0)
   const losses = closed.filter((item) => item.netPnl < 0)
   const targetHits = closed.filter((item) => item.exitReason === 'TARGET_2_USD')
@@ -282,10 +322,10 @@ export function getWeekendLearningCampaignStatus() {
     enabled: weekendLearningCampaignConfig.enabled,
     mode: 'WEEKEND_SHADOW_LEARNING_CAMPAIGN',
     targetSamples: weekendLearningCampaignConfig.targetSamples,
-    completedSamples: closed.length,
-    openSamples: state.openSamples.length,
-    remainingSamples: Math.max(0, weekendLearningCampaignConfig.targetSamples - closed.length),
-    progressPercent: Number((closed.length / Math.max(1, weekendLearningCampaignConfig.targetSamples) * 100).toFixed(1)),
+    completedSamples,
+    openSamples: completedSamples >= weekendLearningCampaignConfig.targetSamples ? 0 : state.openSamples.length,
+    remainingSamples: Math.max(0, weekendLearningCampaignConfig.targetSamples - completedSamples),
+    progressPercent: Math.min(100, Number((completedSamples / Math.max(1, weekendLearningCampaignConfig.targetSamples) * 100).toFixed(1))),
     maxConcurrentSamples: weekendLearningCampaignConfig.maxConcurrentSamples,
     targetNetUsd: weekendLearningCampaignConfig.targetNetUsd,
     maxLossUsd: weekendLearningCampaignConfig.maxLossUsd,
