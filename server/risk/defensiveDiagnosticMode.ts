@@ -74,7 +74,7 @@ export function getDefensiveDiagnosticMode(account: AccountSnapshot): DefensiveD
   if (closedToday.length >= 10 && expectedPayoff <= 0) softReasons.push(`Expected payoff ${expectedPayoff.toFixed(2)} no positivo.`)
   if (consecutiveLosses() >= 3) softReasons.push('Tres perdidas consecutivas detectadas.')
   if (openPnl < -20) hardReasons.push(`Open P/L ${openPnl.toFixed(2)} menor a -$20.`)
-  if (account.marginLevel < 150) hardReasons.push(`Margin level ${account.marginLevel.toFixed(0)}% requiere diagnostico.`)
+  if (account.marginLevel < 115) hardReasons.push(`Margin level ${account.marginLevel.toFixed(0)}% requiere diagnostico.`)
   if (account.freeMargin < 0) hardReasons.push(`Free margin ${account.freeMargin.toFixed(2)} negativo.`)
   reasons.push(...hardReasons)
   if (!recoveryProbeActive) reasons.push(...softReasons)

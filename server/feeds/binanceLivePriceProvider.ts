@@ -1,7 +1,7 @@
 import { recordCryptoTick } from '../strategy/cryptoCandleBuilder.js'
 import type { ProviderStatus } from './feedTypes.js'
 
-type BinanceMessage = { data?: { p?: string; q?: string; s?: string; T?: number } }
+type BinanceMessage = { data?: { a?: string; b?: string; p?: string; q?: string; s?: string; T?: number; u?: number } }
 
 export type BinanceLivePrice = {
   symbol: string
@@ -9,6 +9,10 @@ export type BinanceLivePrice = {
   previousPrice: number
   change: number
   changePercent: number
+  bid?: number
+  ask?: number
+  spread?: number
+  spreadBps?: number
   provider: 'Binance' | 'Binance.US'
   feedType: 'REALTIME_TICK'
   lastPriceUpdate: string
@@ -34,26 +38,55 @@ function activeProvider(): 'Binance' | 'Binance.US' {
 }
 
 function streamUrl() {
-  return `wss://${activeHost()}/stream?streams=${symbols.map((s) => `${s.toLowerCase()}@trade`).join('/')}`
+  return `wss://${activeHost()}/stream?streams=${symbols.flatMap((s) => [`${s.toLowerCase()}@trade`, `${s.toLowerCase()}@bookTicker`]).join('/')}`
 }
 
-function update(symbol: string, rawPrice: string | number | undefined, rawQuantity?: string | number, time?: number) {
-  const price = Number(rawPrice)
+function setPrice(symbol: string, input: {
+  ask?: number
+  bid?: number
+  price: number
+  quantity?: number
+  time?: number
+}) {
+  const price = Number(input.price)
   if (!Number.isFinite(price) || price <= 0) return
+  const bid = Number(input.bid)
+  const ask = Number(input.ask)
+  const hasBidAsk = Number.isFinite(bid) && bid > 0 && Number.isFinite(ask) && ask > bid
   const key = symbol.toUpperCase()
-  const previous = prices.get(key)?.price ?? price
+  const current = prices.get(key)
+  const previous = current?.price ?? price
+  const nextBid = hasBidAsk ? bid : current?.bid
+  const nextAsk = hasBidAsk ? ask : current?.ask
+  const spread = nextBid && nextAsk ? nextAsk - nextBid : undefined
+  const spreadBps = spread && price > 0 ? Number((spread / price * 10_000).toFixed(6)) : undefined
   prices.set(key, {
     symbol: key,
     price,
     previousPrice: previous,
     change: Number((price - previous).toFixed(8)),
     changePercent: previous > 0 ? Number(((price / previous - 1) * 100).toFixed(6)) : 0,
+    bid: nextBid,
+    ask: nextAsk,
+    spread,
+    spreadBps,
     provider: activeProvider(),
     feedType: 'REALTIME_TICK',
     lastPriceUpdate: new Date().toISOString(),
     connected: status === 'CONNECTED',
   })
-  recordCryptoTick(key, price, Number(rawQuantity ?? 0), time ?? Date.now())
+  recordCryptoTick(key, price, Number(input.quantity ?? 0), input.time ?? Date.now())
+}
+
+function updateTrade(symbol: string, rawPrice: string | number | undefined, rawQuantity?: string | number, time?: number) {
+  setPrice(symbol, { price: Number(rawPrice), quantity: Number(rawQuantity ?? 0), time })
+}
+
+function updateBook(symbol: string, rawBid: string | number | undefined, rawAsk: string | number | undefined, time?: number) {
+  const bid = Number(rawBid)
+  const ask = Number(rawAsk)
+  if (!Number.isFinite(bid) || bid <= 0 || !Number.isFinite(ask) || ask <= bid) return
+  setPrice(symbol, { ask, bid, price: (bid + ask) / 2, time })
 }
 
 function reconnect() {
@@ -77,7 +110,8 @@ function connect() {
     socket.addEventListener('message', (event) => {
       try {
         const data = JSON.parse(String(event.data)) as BinanceMessage
-        if (data.data?.s && data.data.p) update(data.data.s, data.data.p, data.data.q, data.data.T)
+        if (data.data?.s && data.data.p) updateTrade(data.data.s, data.data.p, data.data.q, data.data.T)
+        if (data.data?.s && data.data.b && data.data.a) updateBook(data.data.s, data.data.b, data.data.a, data.data.u)
       } catch (error) {
         lastError = error instanceof Error ? error.message : String(error)
       }

@@ -16,15 +16,32 @@ function previousParts(asset: string, price: number, explicitPrevious?: number) 
 
 async function binanceRest(symbol: string) {
   for (const provider of [
-    { name: 'Binance REST', url: 'https://api.binance.com/api/v3/ticker/price' },
-    { name: 'Binance.US REST', url: 'https://api.binance.us/api/v3/ticker/price' },
+    { name: 'Binance REST', baseUrl: 'https://api.binance.com/api/v3' },
+    { name: 'Binance.US REST', baseUrl: 'https://api.binance.us/api/v3' },
   ]) {
     try {
-      const response = await fetch(`${provider.url}?symbol=${encodeURIComponent(symbol)}`)
-      if (!response.ok) continue
-      const payload = await response.json() as { price?: string }
-      const price = Number(payload.price)
-      if (Number.isFinite(price) && price > 0) return { price, provider: provider.name }
+      const book = await fetch(`${provider.baseUrl}/ticker/bookTicker?symbol=${encodeURIComponent(symbol)}`)
+      if (book.ok) {
+        const payload = await book.json() as { askPrice?: string; bidPrice?: string }
+        const bid = Number(payload.bidPrice)
+        const ask = Number(payload.askPrice)
+        if (Number.isFinite(bid) && bid > 0 && Number.isFinite(ask) && ask > bid) {
+          return {
+            ask,
+            bid,
+            price: (bid + ask) / 2,
+            provider: `${provider.name} bookTicker`,
+            spread: ask - bid,
+            spreadBps: (ask - bid) / ((bid + ask) / 2) * 10_000,
+          }
+        }
+      }
+      const response = await fetch(`${provider.baseUrl}/ticker/price?symbol=${encodeURIComponent(symbol)}`)
+      if (response.ok) {
+        const payload = await response.json() as { price?: string }
+        const price = Number(payload.price)
+        if (Number.isFinite(price) && price > 0) return { price, provider: provider.name }
+      }
     } catch {
       // Try the next public endpoint.
     }
@@ -46,6 +63,10 @@ export async function getLivePrice(asset: string): Promise<LivePrice> {
         change: parts.change,
         changePercent: parts.changePercent,
         provider: tick.provider,
+        ask: tick.ask,
+        bid: tick.bid,
+        spread: tick.spread,
+        spreadBps: tick.spreadBps,
         feedType: 'REALTIME_TICK',
         lastPriceUpdate: tick.lastPriceUpdate,
         isDynamicPriceAvailable: true,
@@ -66,6 +87,10 @@ export async function getLivePrice(asset: string): Promise<LivePrice> {
           change: parts.change,
           changePercent: parts.changePercent,
           provider: restPrice.provider,
+          ask: restPrice.ask,
+          bid: restPrice.bid,
+          spread: restPrice.spread,
+          spreadBps: restPrice.spreadBps,
           feedType: 'DELAYED_INTRADAY',
           lastPriceUpdate: new Date().toISOString(),
           isDynamicPriceAvailable: true,

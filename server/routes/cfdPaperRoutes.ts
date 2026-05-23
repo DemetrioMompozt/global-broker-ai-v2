@@ -26,6 +26,7 @@ import { activateDefensiveDiagnosticMode, activateRecoveryProbeMode, getDefensiv
 import { evaluateAccountHealth, type AccountHealthState } from '../risk/accountHealthGuard.js'
 import { multiPositionLimits } from '../risk/multiPositionPortfolioPolicy.js'
 import { scanGlobalOpportunities, type Opportunity } from '../strategy/globalOpportunityScanner.js'
+import { buildControlledProbeOpportunity } from '../strategy/controlledProbePolicy.js'
 import { getPaperAccountBase } from '../storage/paperAccountStore.js'
 import { applyClosedPnl } from '../storage/paperAccountStore.js'
 import { closePosition, getClosedTrades, getOpenPositions } from '../storage/tradeStore.js'
@@ -416,27 +417,43 @@ async function evaluateAgentCycle() {
   if (!defensiveDiagnostic.active && !health.blockNewEntries && !recoveryMarginLocked && getPerformanceGuardStatus().status === 'APPROVED') {
     const openSymbols = new Set(getOpenPositions().map((position) => position.cfdSymbol))
     const recoveryBlocked: Array<{ cfdSymbol: string; reason: string }> = []
-    const candidates = scan.opportunities.filter((opportunity) => {
-      if (!opportunity.setupConfirmed || opportunity.opportunityScore < 85 || openSymbols.has(opportunity.cfdSymbol)) return false
+    const candidates: Opportunity[] = []
+    for (const rawOpportunity of scan.opportunities) {
+      if (openSymbols.has(rawOpportunity.cfdSymbol)) continue
+      const probe = defensiveDiagnostic.mode === 'RECOVERY_PROBE_MODE'
+        ? buildControlledProbeOpportunity({ account, openPositions: getOpenPositions(), opportunity: rawOpportunity })
+        : { approved: rawOpportunity.setupConfirmed && rawOpportunity.opportunityScore >= 85, opportunity: rawOpportunity, reason: 'Setup confirmado.' }
+      if (!probe.approved) {
+        recoveryBlocked.push({ cfdSymbol: rawOpportunity.cfdSymbol, reason: probe.reason })
+        continue
+      }
+      const opportunity = probe.opportunity
+      if (!opportunity.setupConfirmed || opportunity.opportunityScore < 85) {
+        recoveryBlocked.push({ cfdSymbol: opportunity.cfdSymbol, reason: `Setup/score insuficiente: ${opportunity.setupStatus}, score ${opportunity.opportunityScore.toFixed(0)}.` })
+        continue
+      }
       const probeMinScore = opportunity.source === 'BINANCE_REALTIME' || opportunity.assetClass === 'CRYPTO_CFD' ? 86 : 90
-      const probeMinCfdScore = opportunity.source === 'BINANCE_REALTIME' || opportunity.assetClass === 'CRYPTO_CFD' ? 87 : 88
+      const probeMinCfdScore = opportunity.setupStatus === 'CONTROLLED_PROBE'
+        ? opportunity.assetClass === 'CRYPTO_CFD' ? 85 : 82
+        : opportunity.source === 'BINANCE_REALTIME' || opportunity.assetClass === 'CRYPTO_CFD' ? 87 : 88
       if (defensiveDiagnostic.mode === 'RECOVERY_PROBE_MODE' && ((opportunity.opportunityScore ?? 0) < probeMinScore || (opportunity.cfdExpertScore ?? 0) < probeMinCfdScore)) {
         recoveryBlocked.push({ cfdSymbol: opportunity.cfdSymbol, reason: `Recovery probe exige score >= ${probeMinScore} y CFD score >= ${probeMinCfdScore}. Score ${opportunity.opportunityScore.toFixed(0)}, CFD ${(opportunity.cfdExpertScore ?? 0).toFixed(0)}.` })
-        return false
+        continue
       }
       const traderGate = validateTraderEntryGate({ account, effectiveness, openPositions: getOpenPositions(), opportunity })
       if (!traderGate.approved) {
         recoveryBlocked.push({ cfdSymbol: opportunity.cfdSymbol, reason: traderGate.reason })
-        return false
+        continue
       }
       const recovery = validateRecoveryCandidate({ effectiveness, opportunity })
       if (!recovery.approved) {
         recoveryBlocked.push({ cfdSymbol: opportunity.cfdSymbol, reason: recovery.reason })
-        return false
+        continue
       }
+      if (opportunity.setupStatus === 'CONTROLLED_PROBE') pushActivity({ action: 'CONTROLLED_PROBE_APPROVED', symbol: opportunity.cfdSymbol, reason: probe.reason })
       if (recoveryMode) pushActivity({ action: 'RECOVERY_SNIPER_APPROVED', symbol: opportunity.cfdSymbol, reason: recovery.reason })
-      return true
-    })
+      candidates.push(opportunity)
+    }
     if (recoveryBlocked.length) {
       lastBlocked = [...lastBlocked, ...recoveryBlocked]
       for (const blocked of recoveryBlocked.slice(0, 3)) pushActivity({ action: 'BLOCK_BY_RECOVERY_GUARD', symbol: blocked.cfdSymbol, reason: blocked.reason })
@@ -473,7 +490,9 @@ async function evaluateAgentCycle() {
       attemptedOrBlocked = true
       lastDecision = { decision: opened.opened ? 'OPEN' : 'BLOCK', reason: opened.reason, symbol: opportunity.cfdSymbol }
       const action = opened.opened
-        ? opportunity.source === 'VT_MARKETS_MT5_DEMO' ? 'OPEN_VT_CFD_PAPER' : 'OPEN_BINANCE_CFD_PAPER'
+        ? opportunity.setupStatus === 'CONTROLLED_PROBE'
+          ? 'OPEN_CONTROLLED_PROBE_CFD_PAPER'
+          : opportunity.source === 'VT_MARKETS_MT5_DEMO' ? 'OPEN_VT_CFD_PAPER' : 'OPEN_BINANCE_CFD_PAPER'
         : 'BLOCK_BY_PORTFOLIO_POLICY'
       pushActivity({ action, symbol: opportunity.cfdSymbol, reason: opened.reason })
       if (opened.opened) openedCount += 1

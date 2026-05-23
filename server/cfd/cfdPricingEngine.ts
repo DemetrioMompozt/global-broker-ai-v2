@@ -67,8 +67,9 @@ export async function getCfdQuote(cfdSymbol: string): Promise<CfdQuote> {
     }
   }
   const live = await getLivePrice(instrument?.underlyingSymbol ?? cfdSymbol)
-  const spreadBps = instrument?.assetClass === 'CRYPTO_CFD' ? 10 : 5
-  const spread = live.price > 0 ? live.price * spreadBps / 10_000 : 0
+  const fallbackSpreadBps = instrument?.assetClass === 'CRYPTO_CFD' ? 10 : 5
+  const spreadBps = Number.isFinite(live.spreadBps) && (live.spreadBps ?? 0) > 0 ? live.spreadBps! : fallbackSpreadBps
+  const spread = Number.isFinite(live.spread) && (live.spread ?? 0) > 0 ? live.spread! : live.price > 0 ? live.price * spreadBps / 10_000 : 0
   const bid = live.bid ?? Math.max(0, live.price - spread / 2)
   const ask = live.ask ?? live.price + spread / 2
   const mid = (bid + ask) / 2

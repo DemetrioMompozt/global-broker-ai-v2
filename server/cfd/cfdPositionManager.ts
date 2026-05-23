@@ -74,9 +74,10 @@ export async function updateOpenPositions() {
     const traderSkillCutLoser = Boolean(position.source === 'VT_MARKETS_MT5_DEMO' && ageSeconds >= 75 && netPnl <= -2 && !sameDirectionVtEdge)
     const givebackProtection = Boolean(bestOpenPnl >= 1.1 && netPnl <= -0.15 && ageSeconds >= 45)
     const cryptoFastInvalidated = position.assetClass === 'CRYPTO_CFD' && ageSeconds >= 75 && netPnl <= -1
+    const microTimeStop = ageSeconds >= microProfitConfig.maxHoldSeconds
     const stopHit = position.direction === 'LONG' ? currentPrice <= position.stopLoss : currentPrice >= position.stopLoss
     const tpHit = position.direction === 'LONG' ? currentPrice >= position.takeProfit : currentPrice <= position.takeProfit
-    if (microTarget.close || vtThesisInvalidated || vtThesisLost || traderSkillCutLoser || givebackProtection || cryptoFastInvalidated || maxLossHit || stopHit || tpHit) {
+    if (microTarget.close || vtThesisInvalidated || vtThesisLost || traderSkillCutLoser || givebackProtection || cryptoFastInvalidated || microTimeStop || maxLossHit || stopHit || tpHit) {
       const exitReason = microTarget.close
         ? 'MICRO_CLOSE_TARGET'
         : vtThesisInvalidated
@@ -89,6 +90,8 @@ export async function updateOpenPositions() {
             ? 'TRADER_SKILL_GIVEBACK_PROTECTION'
           : cryptoFastInvalidated
             ? 'CRYPTO_FAST_INVALIDATION'
+          : microTimeStop
+            ? 'MICRO_TIME_STOP'
             : maxLossHit ? 'MICRO_MAX_LOSS' : stopHit ? 'STOP_LOSS' : 'TAKE_PROFIT'
       const trade = closePosition(position.id, currentPrice, exitReason, netPnl, openPnl)
       if (trade) {

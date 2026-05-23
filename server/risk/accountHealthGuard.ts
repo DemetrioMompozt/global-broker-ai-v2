@@ -20,19 +20,19 @@ export function evaluateAccountHealth(account: AccountSnapshot, openPositions: C
   if (account.freeMargin < 0) {
     state = 'CRITICAL_MARGIN_DEFENSIVE'
     reasons.push('Free margin negativo. El agente debe liberar margen antes de operar.')
-  } else if (account.freeMargin < account.equity * 0.12) {
+  } else if (account.freeMargin < account.equity * 0.1) {
     state = 'DEFENSIVE'
-    reasons.push('Free margin menor al 12% del equity. Nuevas entradas bloqueadas hasta recuperar aire.')
+    reasons.push('Free margin menor al 10% del equity. Nuevas entradas bloqueadas hasta recuperar aire.')
   }
 
-  if (account.marginLevel < 150) {
+  if (account.marginLevel < 115) {
     state = state === 'CRITICAL_MARGIN_DEFENSIVE' ? state : 'MARGIN_WARNING'
-    reasons.push('Margin level menor a 150%. Nuevas entradas bloqueadas.')
+    reasons.push('Margin level menor a 115%. Nuevas entradas bloqueadas.')
   }
 
-  if (account.usedMargin > account.equity * 0.82) {
+  if (account.usedMargin > account.equity * 0.9) {
     if (state === 'HEALTHY') state = 'DEFENSIVE'
-    reasons.push('Used margin supera 82% del equity. Reducir exposicion antes de abrir mas.')
+    reasons.push('Used margin supera 90% del equity. Reducir exposicion antes de abrir mas.')
   }
 
   const maxAllowedOpenPositions = state === 'HEALTHY'

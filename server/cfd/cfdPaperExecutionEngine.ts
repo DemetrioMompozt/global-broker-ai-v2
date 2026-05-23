@@ -43,7 +43,7 @@ export async function openCfdPaperPosition(
   const desiredCorePositions = tradingConfig.maxOpenPositions
   const maxRequestedLeverage = riskControls.maxLeverage ?? 25
   const effectiveLeverage = instrument.assetClass === 'CRYPTO_CFD' ? 1 : Math.min(maxRequestedLeverage, instrument.maxLeverage)
-  const maxHealthyUsedMargin = equity * 0.96
+  const maxHealthyUsedMargin = equity * (instrument.assetClass === 'CRYPTO_CFD' ? 0.78 : 0.92)
   const slotsToReserve = 1
   const marginBudgetForThisTrade = Math.max(0, (maxHealthyUsedMargin - usedMargin) / slotsToReserve)
   const maxNotionalExposure = marginBudgetForThisTrade * effectiveLeverage

@@ -33,6 +33,7 @@
     "test:target-feasibility": "tsx server/tests/target-feasibility.test.ts",
     "test:trader-firewall": "tsx server/tests/trader-firewall.test.ts",
     "test:candle-behavior": "tsx server/tests/candle-behavior.test.ts",
+    "test:controlled-probe": "tsx server/tests/controlled-probe-policy.test.ts",
     "test:cfd-research-learning": "tsx server/tests/cfd-research-learning.test.ts"
   },
   "dependencies": {
