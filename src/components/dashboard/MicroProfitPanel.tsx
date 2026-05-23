@@ -1,6 +1,4 @@
 import type { MicroProfitStatus } from '../../types/trading'
-import { setMicroProfitTarget } from '../../api/client'
-import { useEffect, useState } from 'react'
 
 const money = new Intl.NumberFormat('en-US', { currency: 'USD', style: 'currency', maximumFractionDigits: 2 })
 
@@ -10,25 +8,11 @@ function labelForTarget(target: number) {
   return '$3 neto experimental'
 }
 
-export function MicroProfitPanel({ microProfit, onRefresh }: { microProfit: MicroProfitStatus; onRefresh: () => void }) {
-  const [localTarget, setLocalTarget] = useState(microProfit.targetNetUsd)
-  const [pendingTarget, setPendingTarget] = useState<number | null>(null)
-
-  useEffect(() => {
-    setLocalTarget(microProfit.targetNetUsd)
-    setPendingTarget(null)
-  }, [microProfit.targetNetUsd])
-
+export function MicroProfitPanel({ microProfit }: { microProfit: MicroProfitStatus }) {
+  const localTarget = microProfit.targetNetUsd
   const costLimits = {
     maxSpreadCostUsd: localTarget * 0.2,
     maxTotalEstimatedCostUsd: localTarget * 0.3,
-  }
-
-  async function changeTarget(target: 1 | 2 | 3) {
-    setLocalTarget(target)
-    setPendingTarget(target)
-    await setMicroProfitTarget(target)
-    await onRefresh()
   }
 
   return (
@@ -39,17 +23,10 @@ export function MicroProfitPanel({ microProfit, onRefresh }: { microProfit: Micr
           <h3>Micro target neto</h3>
           <p className="muted">Cierra solo cuando el P/L neto cubre spread, comision, slippage estimado y swap acumulado.</p>
         </div>
-        <div className="segmented">
-          {microProfit.targetOptionsUsd.map((target) => (
-            <button
-              className={localTarget === target ? 'active' : 'secondary'}
-              key={target}
-              disabled={pendingTarget !== null}
-              onClick={() => void changeTarget(target)}
-            >
-              {pendingTarget === target ? 'Aplicando...' : labelForTarget(target)}
-            </button>
-          ))}
+        <div className="auto-status-card">
+          <span>Target automatico</span>
+          <strong>{labelForTarget(localTarget)}</strong>
+          <small>El servidor gestiona el target sin controles manuales.</small>
         </div>
       </div>
       <div className="position-metrics">

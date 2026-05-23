@@ -1,10 +1,9 @@
 import type { CfdPosition } from '../../types/trading'
-import { closePosition } from '../../api/client'
 
 const money = new Intl.NumberFormat('en-US', { currency: 'USD', style: 'currency', maximumFractionDigits: 4 })
 const num = new Intl.NumberFormat('en-US', { maximumFractionDigits: 6 })
 
-export function OpenCfdPositions({ maxPositions = 10, positions, onRefresh }: { maxPositions?: number; positions: CfdPosition[]; onRefresh: () => void }) {
+export function OpenCfdPositions({ maxPositions = 10, positions }: { maxPositions?: number; positions: CfdPosition[] }) {
   const totalPnl = positions.reduce((sum, position) => sum + position.openPnl, 0)
   const vtCount = positions.filter((position) => position.source === 'VT_MARKETS_MT5_DEMO').length
   const binanceCount = positions.filter((position) => position.source === 'BINANCE_REALTIME' || position.assetClass === 'CRYPTO_CFD').length
@@ -73,7 +72,6 @@ export function OpenCfdPositions({ maxPositions = 10, positions, onRefresh }: { 
               {position.lastBrokerTickTime ? <span>Hora broker: {new Date(position.lastBrokerTickTime).toLocaleTimeString()}</span> : null}
             </div>
             <p className="reason">{position.professionalSkillReason ?? position.cfdExpertReason}</p>
-            <button className="secondary" onClick={() => void closePosition(position.id).then(onRefresh)}>Cerrar paper</button>
           </article>
         ))}
       </div>

@@ -1,9 +1,8 @@
 import type { DefensiveDiagnosticStatus } from '../../types/trading'
-import { activateDefensiveDiagnostic, activateRecoveryProbe } from '../../api/client'
 
 const money = new Intl.NumberFormat('en-US', { currency: 'USD', style: 'currency', maximumFractionDigits: 2 })
 
-export function DefensiveDiagnosticMode({ diagnostic, onRefresh }: { diagnostic: DefensiveDiagnosticStatus; onRefresh: () => void }) {
+export function DefensiveDiagnosticMode({ diagnostic }: { diagnostic: DefensiveDiagnosticStatus }) {
   const isRecovery = diagnostic.mode === 'RECOVERY_PROBE_MODE'
   const tone = diagnostic.active ? 'loss' : 'gain'
 
@@ -24,10 +23,6 @@ export function DefensiveDiagnosticMode({ diagnostic, onRefresh }: { diagnostic:
         <span>Reactivacion risk: <strong>{money.format(diagnostic.reactivationRiskUsd)}</strong></span>
         <span>Leverage reactivacion: <strong>{diagnostic.maxReactivationLeverage}x max</strong></span>
         <span>Posiciones reactivacion: <strong>{diagnostic.maxReactivationOpenPositions}</strong></span>
-      </div>
-      <div className="hero-actions">
-        <button className={isRecovery ? 'active' : 'secondary'} onClick={() => void activateRecoveryProbe().then(onRefresh)}>Modo intermedio</button>
-        <button className={diagnostic.active ? 'active' : 'secondary'} onClick={() => void activateDefensiveDiagnostic().then(onRefresh)}>Freno defensivo</button>
       </div>
       <p className={isRecovery ? 'reason' : 'warning'}>
         {isRecovery

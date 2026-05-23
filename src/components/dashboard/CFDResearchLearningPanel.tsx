@@ -1,5 +1,3 @@
-import { useState } from 'react'
-import { runResearchLearning } from '../../api/client'
 import type { CfdResearchLearningStatus } from '../../types/trading'
 
 function tone(status: CfdResearchLearningStatus['status']) {
@@ -44,24 +42,8 @@ const fallbackLearning: CfdResearchLearningStatus = {
   },
 }
 
-export function CFDResearchLearningPanel({ learning: incomingLearning, onRefresh }: { learning?: CfdResearchLearningStatus; onRefresh: () => void }) {
+export function CFDResearchLearningPanel({ learning: incomingLearning }: { learning?: CfdResearchLearningStatus }) {
   const learning = incomingLearning ?? fallbackLearning
-  const [running, setRunning] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
-
-  async function handleRunResearch() {
-    setRunning(true)
-    setMessage('GPT-5.5 esta revisando journal, velas, costos y tecnicas CFD.')
-    try {
-      const result = await runResearchLearning()
-      setMessage(result.cfdResearchLearning.summary)
-      onRefresh()
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error))
-    } finally {
-      setRunning(false)
-    }
-  }
 
   return (
     <section className="panel">
@@ -71,10 +53,10 @@ export function CFDResearchLearningPanel({ learning: incomingLearning, onRefresh
           <h3 className={tone(learning.status)}>{label(learning.status)}</h3>
           <p className="muted">{learning.summary}</p>
         </div>
-        <div className="hero-actions">
-          <button onClick={handleRunResearch} disabled={running || !learning.enabled || !learning.configured}>
-            {running || learning.status === 'RUNNING' ? 'Investigando...' : 'Investigar ahora'}
-          </button>
+        <div className="auto-status-card">
+          <span>Investigacion automatica</span>
+          <strong>{learning.status === 'RUNNING' ? 'En curso' : learning.configured ? 'Programada' : 'Pendiente'}</strong>
+          <small>GPT-5.5 revisa por intervalo; no opera ni envia ordenes.</small>
         </div>
       </div>
       <div className="position-metrics">
@@ -86,7 +68,6 @@ export function CFDResearchLearningPanel({ learning: incomingLearning, onRefresh
       {!learning.configured ? (
         <p className="warning">Falta OPENAI_API_KEY en el servidor. GPT-5.5 no se ejecuta hasta configurarlo; la app sigue con aprendizaje local y paper safe.</p>
       ) : null}
-      {message ? <p className="reason">{message}</p> : null}
       {learning.error ? <p className="warning">{learning.error}</p> : null}
       <div className="two-column">
         <div className="subpanel">

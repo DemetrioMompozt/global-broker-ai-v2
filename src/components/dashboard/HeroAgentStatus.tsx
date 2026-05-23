@@ -1,7 +1,6 @@
 import type { CfdPaperStatus } from '../../types/trading'
-import { startAgent, stopAgent } from '../../api/client'
 
-export function HeroAgentStatus({ status, onRefresh }: { status: CfdPaperStatus; onRefresh: () => void }) {
+export function HeroAgentStatus({ status }: { status: CfdPaperStatus }) {
   const openCount = status.openPositions.length
   const vtOpenCount = status.openPositions.filter((position) => position.source === 'VT_MARKETS_MT5_DEMO').length
   const binanceOpenCount = status.openPositions.filter((position) => position.source === 'BINANCE_REALTIME' || position.assetClass === 'CRYPTO_CFD').length
@@ -42,9 +41,10 @@ export function HeroAgentStatus({ status, onRefresh }: { status: CfdPaperStatus;
           Ultima evaluacion: {status.agent.lastEvaluationAt ? new Date(status.agent.lastEvaluationAt).toLocaleTimeString() : 'pendiente'} · Proxima: {status.agent.nextEvaluationAt ? new Date(status.agent.nextEvaluationAt).toLocaleTimeString() : 'pendiente'}
         </p>
       </div>
-      <div className="hero-actions">
-        <button disabled={workerRunning} onClick={() => void startAgent().then(onRefresh)}>{workerRunning ? 'Agente corriendo' : 'Iniciar agente paper'}</button>
-        <button className="secondary" disabled={!workerRunning} onClick={() => void stopAgent().then(onRefresh)}>Detener</button>
+      <div className="auto-status-card">
+        <span>Operacion automatica</span>
+        <strong>{workerRunning ? 'Activa 24/7' : 'Reanudando'}</strong>
+        <small>El agente arranca y se mantiene desde el servidor.</small>
       </div>
     </section>
   )

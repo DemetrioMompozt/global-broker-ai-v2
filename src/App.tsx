@@ -23,7 +23,7 @@ import { CFDResearchLearningPanel } from './components/dashboard/CFDResearchLear
 import { LearningCampaignMonitor } from './components/dashboard/LearningCampaignMonitor'
 
 export default function App() {
-  const { status, error, lastRefresh, refresh } = useAutonomousStatus()
+  const { status, error, lastRefresh } = useAutonomousStatus()
 
   if (!status) {
     return (
@@ -38,18 +38,18 @@ export default function App() {
     <AppShell>
       <Header />
       <AccountSummary account={status.account} />
-      <HeroAgentStatus status={status} onRefresh={refresh} />
-      <DefensiveDiagnosticMode diagnostic={status.defensiveDiagnostic} onRefresh={refresh} />
+      <HeroAgentStatus status={status} />
+      <DefensiveDiagnosticMode diagnostic={status.defensiveDiagnostic} />
       <AgentLearningPanel learning={status.adaptiveLearning} />
-      <CFDResearchLearningPanel learning={status.cfdResearchLearning} onRefresh={refresh} />
+      <CFDResearchLearningPanel learning={status.cfdResearchLearning} />
       <LearningCampaignMonitor campaign={status.learningCampaign} />
       <LossAttributionPanel attribution={status.lossAttribution} leverage={status.leverageDamage} target={status.targetFeasibility} />
       <CFDTraderSkillPanel skill={status.cfdTraderSkill} />
       <TraderDecisionEngine decision={status.traderDecision} />
       <AgentEffectivenessMonitor effectiveness={status.agentEffectiveness} />
-      <MicroProfitPanel microProfit={status.microProfit} onRefresh={refresh} />
+      <MicroProfitPanel microProfit={status.microProfit} />
       <div className="refresh-line">UI refresh: {lastRefresh ? new Date(lastRefresh).toLocaleTimeString() : 'pendiente'} · Server: {new Date(status.serverTime).toLocaleTimeString()}</div>
-      <OpenCfdPositions maxPositions={status.limits?.maxTotalOpenPositions ?? 10} positions={status.openPositions} onRefresh={refresh} />
+      <OpenCfdPositions maxPositions={status.limits?.maxTotalOpenPositions ?? 10} positions={status.openPositions} />
       <OpportunityWatchlist opportunities={status.opportunities} blocked={status.blockedOpportunities} />
       <CFDExpertPanel evaluation={status.cfdExpert.lastEvaluation} />
       <RealtimeReadiness feeds={status.feeds} />

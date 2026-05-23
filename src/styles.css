@@ -28,6 +28,10 @@ h3 { font-size: 20px; margin-bottom: 12px; }
 .metric-warn { color: #b45309; }
 .metric-detail, .muted, small { color: #5b6b82; }
 .hero { align-items: center; display: flex; gap: 24px; justify-content: space-between; margin-bottom: 14px; padding: 24px; }
+.auto-status-card { background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; color: #065f46; display: grid; gap: 4px; min-width: 190px; padding: 12px 14px; }
+.auto-status-card span { font-size: 11px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; }
+.auto-status-card strong { color: #064e3b; font-size: 18px; }
+.auto-status-card small { color: #047857; }
 .panel { margin-bottom: 14px; padding: 18px; }
 .refresh-line { color: #64748b; font-size: 13px; margin: 0 0 14px 4px; }
 .position-grid { display: grid; gap: 14px; }

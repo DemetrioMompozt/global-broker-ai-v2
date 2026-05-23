@@ -1,6 +1,6 @@
-import { type FormEvent, useEffect, useRef, useState } from 'react'
-import { connectVtMarketsDemo, fetchBridgeEnvCheck, fetchVtAccount, fetchVtMapping, fetchVtSetupDiagnostics, fetchVtSymbols, fetchVtTick } from '../../api/client'
-import type { BridgeEnvCheck, CfdPaperStatus, VtAccount, VtMappingResponse, VtMarketsConnectionWizardResult, VtSetupDiagnostics, VtSymbolsResponse, VtTickResponse } from '../../types/trading'
+import { useEffect, useRef, useState } from 'react'
+import { connectVtMarketsDemo, fetchBridgeEnvCheck } from '../../api/client'
+import type { BridgeEnvCheck, CfdPaperStatus, VtAccount, VtMarketsConnectionWizardResult } from '../../types/trading'
 import { StatusPill } from '../shared/StatusPill'
 
 const bridgeCommands = `cd global-broker-ai-v2/mt5-bridge
@@ -50,26 +50,17 @@ function SimpleAccount({ account, symbolsCount, feed }: { account: VtAccount | C
 }
 
 export function VTMarketsReadiness({ vt }: { vt: CfdPaperStatus['vtMarkets'] }) {
-  const [serverInput, setServerInput] = useState('')
-  const [loginInput, setLoginInput] = useState('')
-  const [passwordInput, setPasswordInput] = useState('')
   const [wizardResult, setWizardResult] = useState<VtMarketsConnectionWizardResult | null>(null)
-  const [diagnostics, setDiagnostics] = useState<VtSetupDiagnostics | null>(null)
   const [envProbe, setEnvProbe] = useState<BridgeEnvCheck | null>(null)
-  const [accountProbe, setAccountProbe] = useState<VtAccount | null>(null)
-  const [symbolsProbe, setSymbolsProbe] = useState<VtSymbolsResponse | null>(null)
-  const [mappingProbe, setMappingProbe] = useState<VtMappingResponse | null>(null)
-  const [tickProbe, setTickProbe] = useState<VtTickResponse | null>(null)
-  const [advancedMessage, setAdvancedMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const autoConnectAttempted = useRef(false)
 
   const status = simpleStatus(vt, wizardResult)
   const blocked = status === 'Bloqueado por seguridad'
   const connected = status === 'Conectado demo'
-  const account = accountProbe ?? wizardResult?.account ?? vt.account
-  const symbolsCount = symbolsProbe?.symbols.length ?? wizardResult?.technical.symbolsCount ?? vt.symbolsMapped
-  const feed = wizardResult?.technical.testTick?.feedType ?? tickProbe?.feedType ?? (connected ? 'BROKER_DEMO_REALTIME' : null)
+  const account = wizardResult?.account ?? vt.account
+  const symbolsCount = wizardResult?.technical.symbolsCount ?? vt.symbolsMapped
+  const feed = wizardResult?.technical.testTick?.feedType ?? (connected ? 'BROKER_DEMO_REALTIME' : null)
   const hasSavedDemoConfig = envProbe?.valid || vt.enabled
 
   useEffect(() => {
@@ -94,71 +85,6 @@ export function VTMarketsReadiness({ vt }: { vt: CfdPaperStatus['vtMarkets'] }) 
     }
   }, [])
 
-  async function connect(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    setError(null)
-    try {
-      const result = hasSavedDemoConfig
-        ? await connectVtMarketsDemo({})
-        : await connectVtMarketsDemo({
-          login: loginInput,
-          password: passwordInput,
-          server: serverInput,
-        })
-      setWizardResult(result)
-      setPasswordInput('')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    }
-  }
-
-  async function runAdvancedCheck() {
-    setError(null)
-    try {
-      const [nextEnv, nextDiagnostics, nextAccount, nextSymbols] = await Promise.all([
-        fetchBridgeEnvCheck(),
-        fetchVtSetupDiagnostics(),
-        fetchVtAccount(),
-        fetchVtSymbols(),
-      ])
-      setEnvProbe(nextEnv)
-      setDiagnostics(nextDiagnostics)
-      setAccountProbe(nextAccount)
-      setSymbolsProbe(nextSymbols)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    }
-  }
-
-  async function copyCommands() {
-    setError(null)
-    setAdvancedMessage(null)
-    try {
-      await navigator.clipboard.writeText(bridgeCommands)
-      setAdvancedMessage('Comandos copiados para diagnostico avanzado.')
-    } catch {
-      setError('No pude copiar automaticamente. Puedes seleccionar y copiar desde Diagnostico avanzado.')
-    }
-  }
-
-  async function runMapping() {
-    setError(null)
-    try {
-      setMappingProbe(await fetchVtMapping())
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    }
-  }
-
-  async function runTick() {
-    setError(null)
-    try {
-      setTickProbe(await fetchVtTick('NAS100.cfd'))
-    } catch (err) {
-      setTickProbe({ reason: err instanceof Error ? err.message : String(err), status: 'ERROR' })
-    }
-  }
-
   return (
     <section className="panel vt-simple">
       <div className="vt-heading">
@@ -172,31 +98,26 @@ export function VTMarketsReadiness({ vt }: { vt: CfdPaperStatus['vtMarkets'] }) 
 
       <p className={blocked ? 'warning' : 'reason'}>{userMessage(vt, wizardResult)}</p>
 
-      <form className={`demo-config-form ${hasSavedDemoConfig ? 'saved-connect-form' : 'simple-connect-form'}`} onSubmit={(event) => void connect(event)}>
+      <div className="demo-config-form saved-connect-form">
         {hasSavedDemoConfig ? (
           <div className="saved-demo-config">
             <span>Cuenta demo guardada</span>
             <strong>{envProbe?.server || vt.server || 'VT Markets Demo'} · {envProbe?.loginMasked || vt.loginMasked || 'login demo'}</strong>
-            <small>La app usa la configuracion guardada sin mostrar el password.</small>
+            <small>La app se conecta automaticamente sin mostrar el password.</small>
           </div>
         ) : (
-          <>
-            <label>
-              Servidor
-              <input value={serverInput} onChange={(event) => setServerInput(event.target.value)} placeholder="Servidor demo de VT Markets" autoComplete="off" />
-            </label>
-            <label>
-              Login demo
-              <input value={loginInput} onChange={(event) => setLoginInput(event.target.value)} placeholder="Login demo" autoComplete="off" inputMode="numeric" />
-            </label>
-            <label>
-              Password demo
-              <input value={passwordInput} onChange={(event) => setPasswordInput(event.target.value)} placeholder="Password demo" type="password" autoComplete="off" />
-            </label>
-          </>
+          <div className="saved-demo-config">
+            <span>Conector automatico</span>
+            <strong>Esperando configuracion segura del servidor</strong>
+            <small>No se piden credenciales en la pantalla principal.</small>
+          </div>
         )}
-        <button type="submit">{hasSavedDemoConfig ? 'Conectar ahora' : 'Conectar'}</button>
-      </form>
+        <div className="auto-status-card">
+          <span>Conexion automatica</span>
+          <strong>{connected ? 'Activa' : 'Verificando'}</strong>
+          <small>VT Markets se valida en segundo plano.</small>
+        </div>
+      </div>
 
       <div className="readiness simple-safety">
         <StatusPill label="Modo: Demo" ok />
@@ -211,7 +132,7 @@ export function VTMarketsReadiness({ vt }: { vt: CfdPaperStatus['vtMarkets'] }) 
         </div>
       ) : null}
 
-      {connected || accountProbe || wizardResult ? (
+      {connected || wizardResult ? (
         <SimpleAccount account={account} symbolsCount={symbolsCount} feed={feed} />
       ) : null}
 
@@ -219,28 +140,6 @@ export function VTMarketsReadiness({ vt }: { vt: CfdPaperStatus['vtMarkets'] }) 
 
       <details className="advanced-diagnostics">
         <summary>Ver diagnostico avanzado</summary>
-        <div className="hero-actions">
-          <button className="secondary" onClick={() => void runAdvancedCheck()}>Verificar MT5 Bridge</button>
-          <button className="secondary" onClick={() => void fetchBridgeEnvCheck().then(setEnvProbe).catch((err) => setError(String(err)))}>Validar .env</button>
-          <button className="secondary" onClick={() => void copyCommands()}>Copiar comandos para ejecutar bridge</button>
-          <button className="secondary" onClick={() => void fetchVtSymbols().then(setSymbolsProbe).catch((err) => setError(String(err)))}>Buscar simbolos VT Markets</button>
-          <button className="secondary" onClick={() => void runMapping()}>Probar mapping CFD</button>
-          <button className="secondary" onClick={() => void runTick()}>Probar precio VT</button>
-        </div>
-
-        {diagnostics ? (
-          <div className="position-metrics">
-            <span>Bridge running: <strong>{diagnostics.mt5Bridge.reachable ? 'yes' : 'no'}</strong></span>
-            <span>MT5 connected: <strong>{diagnostics.vtMarkets.connected ? 'yes' : 'no'}</strong></span>
-            <span>Mode: <strong>{diagnostics.vtMarkets.mode}</strong></span>
-            <span>Read only: <strong>{String(diagnostics.vtMarkets.readOnly)}</strong></span>
-            <span>Order send: <strong>{String(diagnostics.safety.orderSendAllowed)}</strong></span>
-            <span>Real trading: <strong>{String(diagnostics.safety.realTradingAllowed)}</strong></span>
-            <span>KillSwitch: <strong>{diagnostics.safety.killSwitchStatus}</strong></span>
-            <span>Next: <strong>{diagnostics.nextAction}</strong></span>
-          </div>
-        ) : null}
-
         {envProbe ? (
           <div className="position-metrics">
             <span>.env encontrado: <strong>{envProbe.exists ? 'si' : 'no'}</strong></span>
@@ -254,33 +153,6 @@ export function VTMarketsReadiness({ vt }: { vt: CfdPaperStatus['vtMarkets'] }) 
           </div>
         ) : null}
 
-        {mappingProbe ? (
-          <div className="table compact">
-            <div className="row head"><span>Interno</span><span>Broker</span><span>Status</span><span>Candidatos</span></div>
-            {mappingProbe.mappings.map((mapping) => (
-              <div className="row" key={mapping.internalSymbol}>
-                <span>{mapping.internalSymbol}</span>
-                <span>{mapping.brokerSymbol ?? '-'}</span>
-                <span>{mapping.mappingStatus}</span>
-                <span>{mapping.candidates.join(', ')}</span>
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        {tickProbe ? (
-          <div className="position-metrics">
-            <span>CFD: <strong>{tickProbe.cfdSymbol ?? 'NAS100.cfd'}</strong></span>
-            <span>Broker symbol: <strong>{tickProbe.brokerSymbol ?? '-'}</strong></span>
-            <span>Bid: <strong>{tickProbe.bid ?? '-'}</strong></span>
-            <span>Ask: <strong>{tickProbe.ask ?? '-'}</strong></span>
-            <span>Mid: <strong>{tickProbe.mid ?? '-'}</strong></span>
-            <span>Spread: <strong>{tickProbe.spread ?? '-'}</strong></span>
-            <span>Spread bps: <strong>{tickProbe.spreadBps ?? '-'}</strong></span>
-            <span>Provider: <strong>{tickProbe.provider ?? tickProbe.reason ?? '-'}</strong></span>
-          </div>
-        ) : null}
-
         <div className="code-card">
           <strong>Comandos tecnicos</strong>
           <pre>{bridgeCommands}</pre>
@@ -289,7 +161,6 @@ export function VTMarketsReadiness({ vt }: { vt: CfdPaperStatus['vtMarkets'] }) 
           <strong>Archivo tecnico del bridge</strong>
           <pre>{envTemplate}</pre>
         </div>
-        {advancedMessage ? <p className="reason">{advancedMessage}</p> : null}
       </details>
     </section>
   )
