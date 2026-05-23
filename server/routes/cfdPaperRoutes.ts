@@ -574,6 +574,7 @@ async function statusPayload() {
     },
     agent: {
       status: agentStatus,
+      workerRunning: Boolean(loop),
       lastEvaluationAt,
       nextEvaluationAt,
       lastDecision,

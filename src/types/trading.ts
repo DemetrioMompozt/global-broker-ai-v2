@@ -16,6 +16,7 @@ export type CfdPaperStatus = {
   }
   agent: {
     status: 'RUNNING' | 'STOPPED' | 'WATCHING' | 'MANAGING'
+    workerRunning: boolean
     lastEvaluationAt: string | null
     nextEvaluationAt: string | null
     lastDecision: Record<string, unknown>
