@@ -30,6 +30,16 @@ export async function openCfdPaperPosition(
 ) {
   const instrument = getCfdInstrument(opportunity.cfdSymbol)
   if (!instrument) return { opened: false, reason: 'Instrumento CFD no registrado.' }
+  if (
+    instrument.assetClass === 'CRYPTO_CFD'
+    && !force
+    && (opportunity.setupStatus === 'WAITING_FOR_CANDLES' || opportunity.candlePattern === 'INSUFFICIENT_CANDLES')
+  ) {
+    return {
+      opened: false,
+      reason: 'Cripto habilitada, pero no se abre main paper con velas insuficientes. Esperando vela cerrada confirmada.',
+    }
+  }
   const direction = opportunity.direction ?? 'LONG'
   const entryPrice = direction === 'LONG' ? opportunity.quote.ask : opportunity.quote.bid
   const requestedRiskPercent = instrument.assetClass === 'CRYPTO_CFD' ? tradingConfig.riskPerCryptoTradePercent : tradingConfig.riskPerTradePercent
@@ -43,7 +53,7 @@ export async function openCfdPaperPosition(
   const desiredCorePositions = tradingConfig.maxOpenPositions
   const maxRequestedLeverage = riskControls.maxLeverage ?? 25
   const effectiveLeverage = instrument.assetClass === 'CRYPTO_CFD' ? 1 : Math.min(maxRequestedLeverage, instrument.maxLeverage)
-  const maxHealthyUsedMargin = equity * (instrument.assetClass === 'CRYPTO_CFD' ? 0.78 : 0.92)
+  const maxHealthyUsedMargin = equity * (instrument.assetClass === 'CRYPTO_CFD' ? 0.45 : 0.7)
   const slotsToReserve = 1
   const marginBudgetForThisTrade = Math.max(0, (maxHealthyUsedMargin - usedMargin) / slotsToReserve)
   const maxNotionalExposure = marginBudgetForThisTrade * effectiveLeverage

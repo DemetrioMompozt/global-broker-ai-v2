@@ -33,18 +33,15 @@ function isCryptoProbeEligible(opportunity: Opportunity, c: CandleReadout) {
   const score = opportunity.opportunityScore ?? 0
   const cfdScore = opportunity.cfdExpertScore ?? 0
   const candleScore = c.score ?? opportunity.candleBehaviorScore ?? 0
-  const lastPriceAgeSeconds = Math.max(0, (Date.now() - new Date(opportunity.quote.lastPriceUpdate).getTime()) / 1000)
-  const freshQuoteBootstrap = !c.available
-    && (c.candlesUsed ?? 0) < 3
-    && lastPriceAgeSeconds <= 90
-    && score >= 79
-    && cfdScore >= 78
   return opportunity.assetClass === 'CRYPTO_CFD'
     && opportunity.quote.feedType === 'REALTIME_TICK'
-    && ['WAITING_FOR_CANDLES', 'SETUP_FORMING'].includes(opportunity.setupStatus)
-    && score >= 79
-    && cfdScore >= 78
-    && (freshQuoteBootstrap || (candleScore >= 55 && (c.available || (c.candlesUsed ?? 0) >= 3)))
+    && opportunity.setupStatus === 'SETUP_FORMING'
+    && score >= 86
+    && cfdScore >= 85
+    && c.available === true
+    && (c.candlesUsed ?? 0) >= 3
+    && candleScore >= 70
+    && c.signal === 'CONFIRMS_ENTRY'
 }
 
 function isVtProbeEligible(opportunity: Opportunity, c: CandleReadout) {
@@ -66,8 +63,9 @@ export function buildControlledProbeOpportunity(input: {
   account: AccountSnapshot
   openPositions: CfdPosition[]
   opportunity: Opportunity
+  relaxed?: boolean
 }) : ControlledProbeDecision {
-  const { account, openPositions, opportunity } = input
+  const { account, openPositions, opportunity, relaxed = false } = input
   const reasons: string[] = []
   const c = candle(opportunity)
   const target = getMicroProfitTargetNetUsd()
@@ -77,16 +75,32 @@ export function buildControlledProbeOpportunity(input: {
   }
   if (openPositions.some((position) => position.cfdSymbol === opportunity.cfdSymbol)) reasons.push('ya existe posicion en el mismo CFD')
   if (!hasUsableLiveFeed(opportunity)) reasons.push('feed vivo no usable')
-  if (account.marginLevel < 160 || account.freeMargin < account.equity * 0.15) reasons.push('margen insuficiente para probe controlado')
+  if (account.marginLevel < 120 || account.freeMargin < account.equity * 0.08) reasons.push('margen insuficiente para probe controlado')
   if (c.signal === 'BLOCKS_ENTRY') reasons.push(`vela bloquea entrada: ${c.pattern ?? 'patron contrario'}`)
-  if ((opportunity.expectedNetProfit ?? 0) < target) reasons.push(`expected net menor al target $${target}`)
+  const minimumExpected = relaxed ? target * 0.7 : target
+  if ((opportunity.expectedNetProfit ?? 0) < minimumExpected) reasons.push(`expected net menor al minimo $${minimumExpected.toFixed(2)} para probe`)
 
-  const cryptoEligible = isCryptoProbeEligible(opportunity, c)
-  const vtEligible = isVtProbeEligible(opportunity, c)
+  const cryptoRelaxedEligible = relaxed
+    && opportunity.assetClass === 'CRYPTO_CFD'
+    && opportunity.quote.feedType === 'REALTIME_TICK'
+    && opportunity.setupStatus !== 'CANDLE_BLOCKED'
+    && (opportunity.opportunityScore ?? 0) >= 78
+    && (opportunity.cfdExpertScore ?? 0) >= 76
+    && c.signal !== 'BLOCKS_ENTRY'
+    && (c.available !== false)
+  const vtRelaxedEligible = relaxed
+    && opportunity.source === 'VT_MARKETS_MT5_DEMO'
+    && opportunity.quote.feedType === 'BROKER_DEMO_REALTIME'
+    && opportunity.setupStatus !== 'NO_DIRECTIONAL_EDGE'
+    && (opportunity.opportunityScore ?? 0) >= 76
+    && (opportunity.cfdExpertScore ?? 0) >= 72
+    && c.signal !== 'BLOCKS_ENTRY'
+  const cryptoEligible = isCryptoProbeEligible(opportunity, c) || cryptoRelaxedEligible
+  const vtEligible = isVtProbeEligible(opportunity, c) || vtRelaxedEligible
   if (!cryptoEligible && !vtEligible) {
     const sourceReason = opportunity.source === 'VT_MARKETS_MT5_DEMO'
-      ? 'VT exige movimiento direccional parcial; no abre cuando esta plano.'
-      : 'Cripto exige score >=79, CFD >=78 y lectura de vela parcial no bloqueante o quote fresco de arranque.'
+      ? 'VT exige movimiento direccional parcial y vela no contraria; no abre cuando esta plano.'
+      : 'Cripto sigue habilitado: si el sistema lleva tiempo sin abrir, permite probe con feed real, vela no contraria y score minimo; no abre con vela bloqueante.'
     reasons.push(sourceReason)
   }
 
@@ -102,9 +116,9 @@ export function buildControlledProbeOpportunity(input: {
       cfdExpertScore: Math.max(opportunity.cfdExpertScore ?? 0, crypto ? 85 : 82),
       decision: 'APPROVED',
       opportunityScore: Math.max(opportunity.opportunityScore ?? 0, crypto ? 86 : 88),
-      reason: `CONTROLLED_PROBE: entrada paper intermedia con feed vivo y vela no bloqueante. ${opportunity.reason}`,
+      reason: `${relaxed ? 'LEARNING_ESCAPE_PROBE' : 'CONTROLLED_PROBE'}: entrada paper intermedia con feed vivo y vela no bloqueante. ${opportunity.reason}`,
       setupConfirmed: true,
-      setupStatus: 'CONTROLLED_PROBE',
+      setupStatus: relaxed ? 'LEARNING_ESCAPE_PROBE' : 'CONTROLLED_PROBE',
     },
     reason: crypto
       ? `Controlled probe aprueba ${opportunity.cfdSymbol}: Binance realtime, score parcial ${(opportunity.opportunityScore ?? 0).toFixed(0)}, vela ${c.pattern ?? 'parcial'} sin bloqueo.`

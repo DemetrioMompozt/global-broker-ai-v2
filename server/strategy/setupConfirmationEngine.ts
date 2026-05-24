@@ -18,6 +18,20 @@ export function confirmCryptoSetup(symbol: string) {
   }
   const recent = candles.slice(-6)
   const first = recent[0]
+  const anomalousJump = recent.slice(1).some((candle, index) => {
+    const prev = recent[index]
+    return prev.close > 0 && Math.abs(candle.close / prev.close - 1) > 0.25
+  })
+  if (anomalousJump) {
+    return {
+      setupStatus: 'DATA_ANOMALY',
+      isConfirmed: false,
+      reason: 'Cripto bloqueada temporalmente: salto anomalo de vela detectado; esperar velas limpias nuevas.',
+      candles: summary,
+      direction: 'LONG' as const,
+      riskReward: 2.1,
+    }
+  }
   const upSteps = recent.slice(1).filter((candle, index) => candle.close > recent[index].close).length
   const downSteps = recent.slice(1).filter((candle, index) => candle.close < recent[index].close).length
   const avgClose = recent.reduce((sum, candle) => sum + candle.close, 0) / recent.length

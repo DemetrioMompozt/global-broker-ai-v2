@@ -63,12 +63,16 @@ export type CfdPaperStatus = {
   agentEffectiveness: AgentEffectivenessStatus
   defensiveDiagnostic: DefensiveDiagnosticStatus
   lossAttribution: LossAttributionStatus
+  lossPatternFirewall: LossPatternFirewallStatus
   targetFeasibility: TargetFeasibilityStatus
   leverageDamage: LeverageDamageStatus
   adaptiveLearning: AdaptiveLearningStatus
   cfdResearchLearning: CfdResearchLearningStatus
+  professionalTradingLibrarySkill: ProfessionalTradingLibrarySkillStatus
   learningCampaign: LearningCampaignStatus
   cfdTraderSkill: CfdTraderSkillStatus
+  professionalAudit: ProfessionalAuditStatus
+  noPositionWatchdog: NoPositionWatchdogStatus
   traderDecision: TraderDecisionStatus
   vtMarkets: {
     broker: string
@@ -264,9 +268,10 @@ export type CfdResearchLearningStatus = {
   configured: boolean
   model: string
   webSearchEnabled: boolean
-  status: 'NOT_CONFIGURED' | 'DISABLED' | 'IDLE' | 'RUNNING' | 'READY' | 'ERROR'
+  status: 'NOT_CONFIGURED' | 'DISABLED' | 'IDLE' | 'RUNNING' | 'READY' | 'ERROR' | 'QUOTA_EXCEEDED'
   lastRunAt: string | null
   nextRunAt: string | null
+  pausedUntil: string | null
   trigger: string | null
   summary: string
   techniquesResearched: string[]
@@ -291,6 +296,24 @@ export type CfdResearchLearningStatus = {
     brokerExecutionEnabled: false
   }
   error?: string
+}
+
+export type ProfessionalTradingLibrarySkillStatus = {
+  enabled: true
+  mode: 'ALWAYS_ON_TRADER_LIBRARY_SKILL'
+  booksLoaded: number
+  lastLoadedAt: string
+  copyrightPolicy: string
+  corePrinciples: string[]
+  candleBehaviorRules: string[]
+  riskRules: string[]
+  operationalImpact: string[]
+  researchSources: Array<{
+    author: string
+    focus: string
+    sourceUrl: string
+    title: string
+  }>
 }
 
 export type LearningCampaignStatus = {
@@ -415,6 +438,15 @@ export type AgentEffectivenessStatus = {
   winRate: number
 }
 
+export type LossPatternFirewallStatus = {
+  active: boolean
+  mode: 'NORMAL' | 'PATTERN_PROTECTION'
+  blockedPattern: string | null
+  reason: string
+  mainPaperAllowed: boolean
+  shadowLearningRecommended: boolean
+}
+
 export type CfdTraderSkillStatus = {
   actionsTaken: TraderSkillAction[]
   blockedActions: TraderSkillAction[]
@@ -451,6 +483,31 @@ export type CfdTraderSkillStatus = {
 export type TraderSkillAction = {
   type: string
   symbol?: string
+  reason: string
+}
+
+export type ProfessionalAuditStatus = {
+  automaticActions: string[]
+  checks: Array<{
+    id: string
+    label: string
+    message: string
+    status: 'PASS' | 'WATCH' | 'FAIL'
+  }>
+  grade: 'PROFESSIONAL_READY' | 'DEGRADED' | 'BLOCKED'
+  headline: string
+  nextAction: string
+  rootCause: string | null
+  score: number
+}
+
+export type NoPositionWatchdogStatus = {
+  active: boolean
+  action: 'OPEN_CONTROLLED_PROBE' | 'WAIT_FOR_CAPACITY' | 'WAIT_FOR_FEED' | 'WAIT_FOR_AUDIT' | 'OBSERVE'
+  candidateSymbol: string | null
+  requiredIdleSeconds: number
+  secondsSinceLastOpen: number
+  status: 'ARMED' | 'TRIGGERED' | 'BLOCKED' | 'OBSERVING'
   reason: string
 }
 

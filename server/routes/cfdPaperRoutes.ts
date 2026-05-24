@@ -13,23 +13,27 @@ import { getLastCfdExpertEvaluation } from '../cfd/cfdExpertAgent.js'
 import { getFeedStatuses } from '../feeds/livePriceService.js'
 import { buildAdaptiveLearning } from '../performance/adaptiveLearningEngine.js'
 import { getCfdResearchLearningStatus, maybeRunCfdResearchLearning, runCfdResearchLearningNow } from '../performance/cfdResearchLearningAgent.js'
+import { getProfessionalTradingLibrarySkillStatus } from '../learning/professionalTradingLibrarySkill.js'
 import { getWeekendLearningCampaignStatus, updateWeekendLearningCampaign } from '../learning/weekendLearningCampaign.js'
 import { buildAgentEffectiveness } from '../performance/agentEffectivenessEngine.js'
 import { buildLeverageDamage } from '../performance/leverageDamageAnalyzer.js'
 import { buildLossAttribution } from '../performance/lossAttributionEngine.js'
 import { getPerformanceSummary } from '../performance/performanceEngine.js'
 import { buildTargetFeasibility } from '../performance/targetFeasibilityAnalyzer.js'
+import { buildProfessionalSystemAudit } from '../ops/professionalSystemAudit.js'
+import { buildNoPositionWatchdog } from '../ops/noPositionWatchdog.js'
 import { getKillSwitchStatus } from '../risk/killSwitch.js'
 import { getPerformanceGuardStatus } from '../risk/performanceGuard.js'
 import { isRecoveryMode, validateRecoveryCandidate } from '../risk/effectivenessRecoveryGuard.js'
+import { buildLossPatternFirewallStatus, validateLossPatternFirewall } from '../risk/lossPatternFirewall.js'
 import { activateDefensiveDiagnosticMode, activateRecoveryProbeMode, getDefensiveDiagnosticMode } from '../risk/defensiveDiagnosticMode.js'
 import { evaluateAccountHealth, type AccountHealthState } from '../risk/accountHealthGuard.js'
 import { multiPositionLimits } from '../risk/multiPositionPortfolioPolicy.js'
 import { scanGlobalOpportunities, type Opportunity } from '../strategy/globalOpportunityScanner.js'
 import { buildControlledProbeOpportunity } from '../strategy/controlledProbePolicy.js'
-import { getPaperAccountBase } from '../storage/paperAccountStore.js'
+import { getPaperAccountBase, reconcilePaperAccountFromClosedPnl } from '../storage/paperAccountStore.js'
 import { applyClosedPnl } from '../storage/paperAccountStore.js'
-import { closePosition, getClosedTrades, getOpenPositions } from '../storage/tradeStore.js'
+import { closePosition, getClosedTrades, getOpenPositions, getTradeJournalIntegrity } from '../storage/tradeStore.js'
 import { getAccount as getVtAccount, getSymbols as getVtSymbols, getVtMarketsStatus } from '../broker/vtMarketsConnector.js'
 
 export const cfdPaperRouter = Router()
@@ -49,6 +53,9 @@ let lastTraderSkillActionsTaken: TraderSkillAction[] = []
 let lastTraderSkillBlockedActions: TraderSkillAction[] = []
 let lastLearningSignature: string | null = null
 let lastResearchLearningRunAt: string | null = null
+let lastAuditGrade: string | null = null
+let lastPositionOpenedAt: string | null = null
+let lastNoPositionWatchdogActivityAt = 0
 const activityFeed: Activity[] = []
 let loop: NodeJS.Timeout | undefined
 let lastStatusPositionUpdateAt = 0
@@ -61,7 +68,8 @@ function pushActivity(item: Omit<Activity, 'time'>) {
 }
 
 function accountSnapshot() {
-  const base = getPaperAccountBase()
+  const journalClosedPnl = getClosedTrades().reduce((sum, trade) => sum + trade.pnl, 0)
+  const base = reconcilePaperAccountFromClosedPnl(journalClosedPnl)
   const open = getOpenPositions()
   const openPnl = open.reduce((sum, position) => sum + position.openPnl, 0)
   const usedMargin = open.reduce((sum, position) => sum + position.marginRequired, 0)
@@ -287,6 +295,30 @@ async function evaluateAgentCycle() {
   }
   let account = accountSnapshot()
   let health = evaluateAccountHealth(account, getOpenPositions())
+  const cycleVtStatus = await getVtMarketsStatus()
+  const cycleAudit = buildProfessionalSystemAudit({
+    account,
+    agent: { lastEvaluationAt, status: agentStatus, workerRunning: Boolean(loop) },
+    closedTrades: getClosedTrades(),
+    feeds: getFeedStatuses(),
+    journal: getTradeJournalIntegrity(),
+    killSwitchStatus: getKillSwitchStatus().status,
+    openPositions: getOpenPositions(),
+    safety: getSafetyConfig(),
+    vtStatus: cycleVtStatus,
+  })
+  if (cycleAudit.grade !== lastAuditGrade) {
+    lastAuditGrade = cycleAudit.grade
+    pushActivity({
+      action: cycleAudit.grade === 'PROFESSIONAL_READY' ? 'SYSTEM_AUDIT_READY' : cycleAudit.grade === 'DEGRADED' ? 'SYSTEM_AUDIT_WARNING' : 'SYSTEM_AUDIT_BLOCK',
+      reason: `${cycleAudit.headline} ${cycleAudit.rootCause ?? cycleAudit.nextAction}`,
+    })
+  }
+  if (cycleAudit.grade === 'BLOCKED') {
+    lastDecision = { decision: 'SYSTEM_AUDIT_BLOCK', reason: cycleAudit.rootCause ?? cycleAudit.headline }
+    agentStatus = getOpenPositions().length ? 'MANAGING' : 'WATCHING'
+    return
+  }
   const defensiveDiagnostic = getDefensiveDiagnosticMode(account)
   if (defensiveDiagnostic.active && !diagnosticModeAnnounced) {
     diagnosticModeAnnounced = true
@@ -301,6 +333,7 @@ async function evaluateAgentCycle() {
     pushActivity({ action: 'TRADE_BLOCKED_MARGIN', reason: health.reasons.join(' ') })
   }
   let effectiveness = buildAgentEffectiveness({ account, activityFeed, blockedOpportunities: lastBlocked, openPositions: getOpenPositions() })
+  let cycleLossAttribution = buildLossAttribution()
   if ((effectiveness.status === 'CORRECTIVE' || effectiveness.status === 'WEAK' || effectiveness.status === 'INEFFICIENT') && getMicroProfitStatus().targetNetUsd < 2) {
     setMicroProfitTargetNetUsd(2)
     pushActivity({ action: 'MICRO_TARGET_AUTO_RESTORE', reason: 'Modo correctivo: target $1 genera churn; se restaura target neto recomendado $2.' })
@@ -335,8 +368,46 @@ async function evaluateAgentCycle() {
     })
   }
   effectiveness = buildAgentEffectiveness({ account, activityFeed, blockedOpportunities: lastBlocked, openPositions: getOpenPositions() })
+  cycleLossAttribution = buildLossAttribution()
   const best = scan.opportunities[0]
+  let noPositionWatchdog = buildNoPositionWatchdog({
+    account,
+    auditGrade: cycleAudit.grade,
+    lastPositionOpenedAt,
+    openPositions: getOpenPositions(),
+    opportunities: scan.opportunities,
+  })
+  if (noPositionWatchdog.active && Date.now() - lastNoPositionWatchdogActivityAt > 30_000) {
+    lastNoPositionWatchdogActivityAt = Date.now()
+    pushActivity({
+      action: 'NO_POSITION_WATCHDOG_TRIGGERED',
+      symbol: noPositionWatchdog.candidateSymbol ?? undefined,
+      reason: noPositionWatchdog.reason,
+    })
+  }
   const rotation = reviewOpenPositions({ account, accountHealth: health.accountHealth, opportunities: scan.opportunities, positions: getOpenPositions() })
+  if (
+    noPositionWatchdog.action === 'WAIT_FOR_CAPACITY'
+    && noPositionWatchdog.secondsSinceLastOpen >= noPositionWatchdog.requiredIdleSeconds
+    && rotation.weakestPosition
+    && (rotation.weakestPosition.position.openPnl <= 0 || rotation.weakestPosition.position.marginRequired > account.equity * 0.45)
+  ) {
+    closeWeakPosition(rotation.weakestPosition, 'NO_POSITION_WATCHDOG_FREE_MARGIN')
+    pushActivity({
+      action: 'NO_POSITION_WATCHDOG_FREE_MARGIN',
+      symbol: rotation.weakestPosition.position.cfdSymbol,
+      reason: 'Watchdog libero margen porque pasaron 2 minutos sin nuevas posiciones y la cuenta tenia capacidad comprimida.',
+    })
+    account = accountSnapshot()
+    health = evaluateAccountHealth(account, getOpenPositions())
+    noPositionWatchdog = buildNoPositionWatchdog({
+      account,
+      auditGrade: cycleAudit.grade,
+      lastPositionOpenedAt,
+      openPositions: getOpenPositions(),
+      opportunities: scan.opportunities,
+    })
+  }
   let traderSkill = buildCfdTraderSkillReadout({
     account,
     actionsTaken: lastTraderSkillActionsTaken,
@@ -383,18 +454,15 @@ async function evaluateAgentCycle() {
   let attemptedOrBlocked = false
   if (defensiveDiagnostic.active) {
     attemptedOrBlocked = true
-    const lossAttribution = buildLossAttribution()
     lastDecision = { decision: 'STOP_NEW_ENTRIES', mode: defensiveDiagnostic.mode, reason: defensiveDiagnostic.reason, symbol: best.cfdSymbol }
     pushActivity({ action: 'STOP_NEW_ENTRIES', symbol: best.cfdSymbol, reason: defensiveDiagnostic.reason })
-    pushActivity({ action: 'LOSS_ATTRIBUTION_REPORT', reason: `Driver probable: ${lossAttribution.mainLossDriver}. ${lossAttribution.recommendations[0]}` })
+    pushActivity({ action: 'LOSS_ATTRIBUTION_REPORT', reason: `Driver probable: ${cycleLossAttribution.mainLossDriver}. ${cycleLossAttribution.recommendations[0]}` })
   } else if (traderSkill.executableActions.some((action) => action.type === 'BLOCK_NEW_ENTRIES')) {
     attemptedOrBlocked = true
     lastDecision = { decision: 'BLOCK', reason: traderSkill.riskWarning, symbol: best.cfdSymbol }
     pushActivity({ action: 'BLOCK_BY_TRADER_DEFENSIVE_MODE', symbol: best.cfdSymbol, reason: traderSkill.riskWarning })
   } else if (effectiveness.status === 'INEFFICIENT' && account.closedPnl <= -getMicroProfitStatus().limits.dailyStopLossUsd) {
-    attemptedOrBlocked = true
-    lastDecision = { decision: 'BLOCK', reason: effectiveness.reason, symbol: best.cfdSymbol }
-    pushActivity({ action: 'EFFECTIVENESS_WEAK', symbol: best.cfdSymbol, reason: effectiveness.reason })
+    pushActivity({ action: 'EFFECTIVENESS_WEAK', symbol: best.cfdSymbol, reason: `${effectiveness.reason} No se apaga: pasa a probes controlados y aprendizaje.` })
   } else if (health.blockNewEntries) {
     attemptedOrBlocked = true
     lastDecision = { decision: 'BLOCK', reason: health.reasons.join(' '), symbol: best.cfdSymbol }
@@ -408,10 +476,10 @@ async function evaluateAgentCycle() {
     }
   }
   const recoveryMode = isRecoveryMode(effectiveness)
-  const recoveryMarginLocked = recoveryMode && (account.marginLevel < 140 || account.freeMargin < account.equity * 0.1)
+  const recoveryMarginLocked = recoveryMode && (account.marginLevel < 120 || account.freeMargin < account.equity * 0.08)
   if (recoveryMarginLocked) {
     attemptedOrBlocked = true
-    lastDecision = { decision: 'BLOCK', reason: 'Modo recovery: margen comprimido. No se abren entradas hasta recuperar margin level > 140% y free margin > 10%.', symbol: best.cfdSymbol }
+    lastDecision = { decision: 'BLOCK', reason: 'Modo recovery: margen criticamente comprimido. No se abren entradas hasta recuperar margin level > 120% y free margin > 8%.', symbol: best.cfdSymbol }
     pushActivity({ action: 'RECOVERY_MARGIN_LOCK', symbol: best.cfdSymbol, reason: String(lastDecision.reason) })
   }
   if (!defensiveDiagnostic.active && !health.blockNewEntries && !recoveryMarginLocked && getPerformanceGuardStatus().status === 'APPROVED') {
@@ -420,8 +488,9 @@ async function evaluateAgentCycle() {
     const candidates: Opportunity[] = []
     for (const rawOpportunity of scan.opportunities) {
       if (openSymbols.has(rawOpportunity.cfdSymbol)) continue
-      const probe = defensiveDiagnostic.mode === 'RECOVERY_PROBE_MODE'
-        ? buildControlledProbeOpportunity({ account, openPositions: getOpenPositions(), opportunity: rawOpportunity })
+      const watchdogPressure = noPositionWatchdog.active
+      const probe = defensiveDiagnostic.mode === 'RECOVERY_PROBE_MODE' || watchdogPressure
+        ? buildControlledProbeOpportunity({ account, openPositions: getOpenPositions(), opportunity: rawOpportunity, relaxed: watchdogPressure })
         : { approved: rawOpportunity.setupConfirmed && rawOpportunity.opportunityScore >= 85, opportunity: rawOpportunity, reason: 'Setup confirmado.' }
       if (!probe.approved) {
         recoveryBlocked.push({ cfdSymbol: rawOpportunity.cfdSymbol, reason: probe.reason })
@@ -432,25 +501,49 @@ async function evaluateAgentCycle() {
         recoveryBlocked.push({ cfdSymbol: opportunity.cfdSymbol, reason: `Setup/score insuficiente: ${opportunity.setupStatus}, score ${opportunity.opportunityScore.toFixed(0)}.` })
         continue
       }
-      const probeMinScore = opportunity.source === 'BINANCE_REALTIME' || opportunity.assetClass === 'CRYPTO_CFD' ? 86 : 90
-      const probeMinCfdScore = opportunity.setupStatus === 'CONTROLLED_PROBE'
+      const probeMinScore = watchdogPressure
+        ? opportunity.source === 'BINANCE_REALTIME' || opportunity.assetClass === 'CRYPTO_CFD' ? 80 : 82
+        : opportunity.source === 'BINANCE_REALTIME' || opportunity.assetClass === 'CRYPTO_CFD' ? 86 : 90
+      const probeMinCfdScore = watchdogPressure
+        ? opportunity.source === 'BINANCE_REALTIME' || opportunity.assetClass === 'CRYPTO_CFD' ? 78 : 76
+        : opportunity.setupStatus === 'CONTROLLED_PROBE'
         ? opportunity.assetClass === 'CRYPTO_CFD' ? 85 : 82
         : opportunity.source === 'BINANCE_REALTIME' || opportunity.assetClass === 'CRYPTO_CFD' ? 87 : 88
       if (defensiveDiagnostic.mode === 'RECOVERY_PROBE_MODE' && ((opportunity.opportunityScore ?? 0) < probeMinScore || (opportunity.cfdExpertScore ?? 0) < probeMinCfdScore)) {
         recoveryBlocked.push({ cfdSymbol: opportunity.cfdSymbol, reason: `Recovery probe exige score >= ${probeMinScore} y CFD score >= ${probeMinCfdScore}. Score ${opportunity.opportunityScore.toFixed(0)}, CFD ${(opportunity.cfdExpertScore ?? 0).toFixed(0)}.` })
         continue
       }
-      const traderGate = validateTraderEntryGate({ account, effectiveness, openPositions: getOpenPositions(), opportunity })
+      const patternFirewall = validateLossPatternFirewall({
+        attribution: cycleLossAttribution,
+        effectiveness,
+        opportunity,
+      })
+      if (!patternFirewall.approved) {
+        recoveryBlocked.push({ cfdSymbol: opportunity.cfdSymbol, reason: patternFirewall.reason })
+        pushActivity({
+          action: 'LOSS_PATTERN_FIREWALL',
+          symbol: opportunity.cfdSymbol,
+          reason: `${patternFirewall.reason} El agente sigue aprendiendo en shadow sin tocar balance ni margen.`,
+        })
+        continue
+      }
+      const traderGate = watchdogPressure
+        ? { approved: true, reason: 'No-position watchdog aprueba presión controlada: el sistema sano no debe quedarse quieto.', repairMode: false }
+        : validateTraderEntryGate({ account, effectiveness, openPositions: getOpenPositions(), opportunity })
       if (!traderGate.approved) {
         recoveryBlocked.push({ cfdSymbol: opportunity.cfdSymbol, reason: traderGate.reason })
         continue
       }
-      const recovery = validateRecoveryCandidate({ effectiveness, opportunity })
+      const recovery = watchdogPressure
+        ? { approved: true, reason: 'Watchdog profesional relaja recovery guard para una entrada paper controlada.' }
+        : validateRecoveryCandidate({ effectiveness, opportunity })
       if (!recovery.approved) {
         recoveryBlocked.push({ cfdSymbol: opportunity.cfdSymbol, reason: recovery.reason })
         continue
       }
       if (opportunity.setupStatus === 'CONTROLLED_PROBE') pushActivity({ action: 'CONTROLLED_PROBE_APPROVED', symbol: opportunity.cfdSymbol, reason: probe.reason })
+      if (opportunity.setupStatus === 'LEARNING_ESCAPE_PROBE') pushActivity({ action: 'LEARNING_ESCAPE_PROBE_APPROVED', symbol: opportunity.cfdSymbol, reason: probe.reason })
+      if (watchdogPressure) pushActivity({ action: 'NO_POSITION_WATCHDOG_APPROVED', symbol: opportunity.cfdSymbol, reason: noPositionWatchdog.reason })
       if (recoveryMode) pushActivity({ action: 'RECOVERY_SNIPER_APPROVED', symbol: opportunity.cfdSymbol, reason: recovery.reason })
       candidates.push(opportunity)
     }
@@ -490,12 +583,15 @@ async function evaluateAgentCycle() {
       attemptedOrBlocked = true
       lastDecision = { decision: opened.opened ? 'OPEN' : 'BLOCK', reason: opened.reason, symbol: opportunity.cfdSymbol }
       const action = opened.opened
-        ? opportunity.setupStatus === 'CONTROLLED_PROBE'
+        ? opportunity.setupStatus === 'CONTROLLED_PROBE' || opportunity.setupStatus === 'LEARNING_ESCAPE_PROBE'
           ? 'OPEN_CONTROLLED_PROBE_CFD_PAPER'
           : opportunity.source === 'VT_MARKETS_MT5_DEMO' ? 'OPEN_VT_CFD_PAPER' : 'OPEN_BINANCE_CFD_PAPER'
         : 'BLOCK_BY_PORTFOLIO_POLICY'
       pushActivity({ action, symbol: opportunity.cfdSymbol, reason: opened.reason })
-      if (opened.opened) openedCount += 1
+      if (opened.opened) {
+        openedCount += 1
+        lastPositionOpenedAt = new Date().toISOString()
+      }
     }
   }
   if (!openedCount && !attemptedOrBlocked) {
@@ -520,8 +616,8 @@ async function safeEvaluateAgentCycle() {
 export function startCfdPaperAgent() {
   if (loop) return
   agentStatus = 'RUNNING'
-  void safeEvaluateAgentCycle()
   loop = setInterval(() => void safeEvaluateAgentCycle(), tradingConfig.agentIntervalMs)
+  void safeEvaluateAgentCycle()
 }
 
 function stopCfdPaperAgent() {
@@ -558,10 +654,12 @@ async function statusPayload() {
   })
   const defensiveDiagnostic = getDefensiveDiagnosticMode(account)
   const lossAttribution = buildLossAttribution()
+  const lossPatternFirewall = buildLossPatternFirewallStatus({ attribution: lossAttribution, effectiveness: agentEffectiveness })
   const targetFeasibility = buildTargetFeasibility()
   const leverageDamage = buildLeverageDamage()
   const adaptiveLearning = buildAdaptiveLearning()
   const cfdResearchLearning = getCfdResearchLearningStatus()
+  const professionalTradingLibrarySkill = getProfessionalTradingLibrarySkillStatus()
   const learningCampaign = getWeekendLearningCampaignStatus()
   const cfdTraderSkill = buildCfdTraderSkillReadout({
     account,
@@ -570,6 +668,24 @@ async function statusPayload() {
     effectiveness: agentEffectiveness,
     opportunities: lastOpportunities,
     positions: openPositions,
+  })
+  const professionalAudit = buildProfessionalSystemAudit({
+    account,
+    agent: { lastEvaluationAt, status: agentStatus, workerRunning: Boolean(loop) },
+    closedTrades: getClosedTrades(),
+    feeds: getFeedStatuses(),
+    journal: getTradeJournalIntegrity(),
+    killSwitchStatus: getKillSwitchStatus().status,
+    openPositions,
+    safety: getSafetyConfig(),
+    vtStatus,
+  })
+  const noPositionWatchdog = buildNoPositionWatchdog({
+    account,
+    auditGrade: professionalAudit.grade,
+    lastPositionOpenedAt,
+    openPositions,
+    opportunities: lastOpportunities,
   })
   return {
     mode: defensiveDiagnostic.mode === 'RECOVERY_PROBE_MODE'
@@ -649,12 +765,16 @@ async function statusPayload() {
     agentEffectiveness,
     defensiveDiagnostic,
     lossAttribution,
+    lossPatternFirewall,
     targetFeasibility,
     leverageDamage,
     adaptiveLearning,
     cfdResearchLearning,
+    professionalTradingLibrarySkill,
     learningCampaign,
     cfdTraderSkill,
+    professionalAudit,
+    noPositionWatchdog,
     traderDecision,
     vtMarkets: {
       ...vtStatus,

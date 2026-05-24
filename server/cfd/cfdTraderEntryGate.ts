@@ -1,4 +1,5 @@
 import { getMicroProfitTargetNetUsd } from '../config/microProfitConfig.js'
+import { evaluateProfessionalTradingLibrarySkill } from '../learning/professionalTradingLibrarySkill.js'
 import { validateAdaptiveLearningGate } from '../performance/adaptiveLearningEngine.js'
 import { buildLossAttribution } from '../performance/lossAttributionEngine.js'
 import type { AccountSnapshot } from '../risk/accountHealthGuard.js'
@@ -55,6 +56,7 @@ export function validateTraderEntryGate(input: {
   const expected = opportunity.expectedNetProfit ?? 0
   const attribution = buildLossAttribution()
   const learning = validateAdaptiveLearningGate(opportunity)
+  const librarySkill = evaluateProfessionalTradingLibrarySkill(opportunity)
   const symbolMemory = attribution.symbolDiagnostics.find((item) => item.symbol === opportunity.cfdSymbol)
   const strategyMemory = strategyLoss(attribution, opportunity.strategy)
   const directionMemory = directionLoss(attribution, opportunity.direction)
@@ -77,6 +79,7 @@ export function validateTraderEntryGate(input: {
     const candle = opportunity.candleBehavior as { reason?: string }
     reasons.push(`candle skill bloquea entrada: ${candle.reason ?? 'vela cerrada no confirma el setup'}`)
   }
+  if (!librarySkill.approved) reasons.push(librarySkill.reason)
   if (!learning.approved) reasons.push(learning.reason)
 
   if (symbolMemory?.status === 'BAN_FOR_SESSION') {

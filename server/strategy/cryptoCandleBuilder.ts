@@ -21,6 +21,7 @@ const timeframeMs: Record<CryptoTimeframe, number> = {
 
 const maxCandles = 500
 const stores = new Map<string, Record<CryptoTimeframe, CryptoCandle[]>>()
+const maxTickJumpRatio = 0.25
 
 function normalize(symbol: string) {
   return symbol.trim().toUpperCase()
@@ -75,11 +76,31 @@ function update(candles: CryptoCandle[], timeframe: CryptoTimeframe, price: numb
   if (candles.length > maxCandles) candles.splice(0, candles.length - maxCandles)
 }
 
+function safeTimestampMs(timestampMs: number) {
+  const now = Date.now()
+  const min = now - 24 * 60 * 60 * 1000
+  const max = now + 60_000
+  return Number.isFinite(timestampMs) && timestampMs >= min && timestampMs <= max ? timestampMs : now
+}
+
+function lastKnownPrice(symbol: string) {
+  const s = store(symbol)
+  return s['5s'].at(-1)?.close ?? s['15s'].at(-1)?.close ?? s['1m'].at(-1)?.close ?? null
+}
+
+function isPlausibleTick(symbol: string, price: number) {
+  const previous = lastKnownPrice(symbol)
+  if (!previous || previous <= 0) return true
+  return Math.abs(price / previous - 1) <= maxTickJumpRatio
+}
+
 export function recordCryptoTick(symbol: string, price: number, quantity = 0, timestampMs = Date.now()) {
   if (!Number.isFinite(price) || price <= 0) return
+  if (!isPlausibleTick(symbol, price)) return
   const s = store(symbol)
+  const safeTime = safeTimestampMs(timestampMs)
   for (const timeframe of Object.keys(timeframeMs) as CryptoTimeframe[]) {
-    update(s[timeframe], timeframe, price, Math.max(0, quantity), timestampMs)
+    update(s[timeframe], timeframe, price, Math.max(0, quantity), safeTime)
   }
 }
 

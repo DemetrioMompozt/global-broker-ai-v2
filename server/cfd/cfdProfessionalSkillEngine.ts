@@ -37,8 +37,18 @@ export function evaluateCfdProfessionalSkill(input: {
   const projectedUsedMargin = input.account.usedMargin + input.marginRequired
   const projectedFreeMargin = input.account.equity - projectedUsedMargin
   const projectedMarginLevel = projectedUsedMargin > 0 ? input.account.equity / projectedUsedMargin * 100 : 9999
-  const netTargetFeasible = input.expectedNetProfit >= input.targetNetUsd
-  const marginHealthy = projectedFreeMargin > input.account.equity * 0.02 && projectedMarginLevel >= 105
+  const netTargetFeasible = input.expectedNetProfit >= input.targetNetUsd - 0.01
+  const maxMarginShare = {
+    CRYPTO_CFD: 0.45,
+    EQUITY_CFD: 0.35,
+    FOREX_CFD: 0.32,
+    INDEX_CFD: 0.38,
+    METAL_CFD: 0.35,
+  }[input.assetClass] ?? 0.35
+  const positionMarginShare = input.account.equity > 0 ? input.marginRequired / input.account.equity : Infinity
+  const marginHealthy = projectedFreeMargin > input.account.equity * 0.2
+    && projectedMarginLevel >= 150
+    && positionMarginShare <= maxMarginShare
   const liveBidAsk = input.quote.pricingQuality === 'LIVE_BID_ASK' && input.quote.bid > 0 && input.quote.ask > input.quote.bid
   const dynamicEstimatedSpread = input.quote.pricingQuality === 'LIVE_MID_ESTIMATED_SPREAD'
     && input.quote.feedType === 'REALTIME_TICK'
@@ -58,14 +68,14 @@ export function evaluateCfdProfessionalSkill(input: {
   const movementReasonable = Number.isFinite(minimumMoveBps) && minimumMoveBps <= movementCeilingBps
 
   if (!pricingProfessionallyUsable) blockingReasons.push('Sin precio CFD dinamico usable: requiere bid/ask vivo de VT o tick realtime con spread estimado conservador.')
-  if (!marginHealthy) blockingReasons.push('Margen post-entrada insuficiente para abrir otra posicion con disciplina profesional.')
+  if (!marginHealthy) blockingReasons.push(`Margen post-entrada insuficiente: margin level ${projectedMarginLevel.toFixed(0)}%, free margin proyectado $${projectedFreeMargin.toFixed(2)}, margen de la posicion ${(positionMarginShare * 100).toFixed(0)}% del equity.`)
   if (!netTargetFeasible) blockingReasons.push(`Expected net profit menor al target neto $${input.targetNetUsd}.`)
   if (!spreadReasonable) blockingReasons.push(`Spread consume mas de $${costLimits.maxSpreadCostUsd.toFixed(2)} del target neto.`)
   if (!costReasonable) blockingReasons.push(`Costos totales consumen mas de $${costLimits.maxTotalEstimatedCostUsd.toFixed(2)} del target neto.`)
   if (!movementReasonable) blockingReasons.push(`Movimiento minimo requerido para $2 netos (${minimumMoveBps.toFixed(2)} bps) excede el rango profesional para ${input.assetClass}.`)
 
   if (minimumMoveBps > movementCeilingBps * 0.6) recommendations.push('Esperar mejor precio/spread o mayor conviccion si el movimiento minimo requerido se acerca al limite profesional.')
-  if (projectedMarginLevel < 120) recommendations.push('Modo demo agresivo: no abrir mas si el margin level cae cerca de 105%.')
+  if (projectedMarginLevel < 180 || positionMarginShare > maxMarginShare * 0.8) recommendations.push('No consumir demasiado margen para buscar $2; esperar mejor spread, mayor movimiento o menor tamano.')
   if (input.costs.costToProfitRatio > 0.2) recommendations.push('No perseguir micro-profit con costos altos; esperar setup mas limpio.')
 
   const disciplineScore = Math.max(0, Math.min(100,

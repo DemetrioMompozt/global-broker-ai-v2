@@ -41,22 +41,22 @@ const cryptoOpportunity: Opportunity = {
     available: true,
     candlesUsed: 3,
     pattern: 'CLOSE_BREAKOUT',
-    score: 57,
-    signal: 'NEUTRAL',
+    score: 74,
+    signal: 'CONFIRMS_ENTRY',
   },
-  candleBehaviorScore: 57,
+  candleBehaviorScore: 74,
   candlePattern: 'CLOSE_BREAKOUT',
-  cfdExpertScore: 78,
+  cfdExpertScore: 85,
   cfdSymbol: 'XRPUSD.cfd',
   decision: 'WATCH',
   direction: 'LONG',
   expectedNetProfit: 2.6,
-  opportunityScore: 81,
+  opportunityScore: 88,
   quote: cryptoQuote,
   reason: 'Faltan velas cerradas suficientes para confirmar cripto sin ruido.',
   riskReward: 2.1,
   setupConfirmed: false,
-  setupStatus: 'WAITING_FOR_CANDLES',
+  setupStatus: 'SETUP_FORMING',
   source: 'BINANCE_REALTIME',
   strategy: 'MomentumContinuation',
   timeframe: 'INTRADAY_SLOW',
@@ -68,6 +68,48 @@ assert(approved.approved, approved.reason)
 assert(approved.opportunity.setupConfirmed, 'Controlled probe debe convertir la entrada paper en setup operable.')
 assert(approved.opportunity.setupStatus === 'CONTROLLED_PROBE', 'Controlled probe debe marcar el setup como CONTROLLED_PROBE.')
 assert((approved.opportunity.cfdExpertScore ?? 0) >= 85, 'Controlled probe cripto debe subir el score operativo minimo.')
+
+const insufficientCandles = buildControlledProbeOpportunity({
+  account,
+  openPositions: [],
+  opportunity: {
+    ...cryptoOpportunity,
+    candleBehavior: {
+      available: false,
+      candlesUsed: 1,
+      pattern: 'INSUFFICIENT_CANDLES',
+      score: 50,
+      signal: 'NEUTRAL',
+    },
+    candleBehaviorScore: 50,
+    candlePattern: 'INSUFFICIENT_CANDLES',
+    setupStatus: 'WAITING_FOR_CANDLES',
+  },
+})
+assert(!insufficientCandles.approved && insufficientCandles.reason.includes('Cripto sigue habilitado'), 'Cripto no debe abrir main paper con velas insuficientes.')
+
+const learningEscape = buildControlledProbeOpportunity({
+  account,
+  openPositions: [],
+  opportunity: {
+    ...cryptoOpportunity,
+    candleBehavior: {
+      available: true,
+      candlesUsed: 2,
+      pattern: 'NEUTRAL_PULLBACK',
+      score: 62,
+      signal: 'NEUTRAL',
+    },
+    candleBehaviorScore: 62,
+    cfdExpertScore: 78,
+    expectedNetProfit: 1.5,
+    opportunityScore: 80,
+    setupStatus: 'NO_SETUP',
+  },
+  relaxed: true,
+})
+assert(learningEscape.approved, learningEscape.reason)
+assert(learningEscape.opportunity.setupStatus === 'LEARNING_ESCAPE_PROBE', 'Watchdog relajado debe convertir a LEARNING_ESCAPE_PROBE para evitar bloqueo permanente.')
 
 const candleBlocked = buildControlledProbeOpportunity({
   account,

@@ -16,24 +16,24 @@ const costs = calculateMicroProfitCosts({ positionSize: 1, spread: 0.2, slippage
 assert(shouldCloseForMicroTarget({ grossPnl: 2.3, costs, targetNetUsd: 2 }).close, 'Debe cerrar cuando netPnl >= target.')
 assert(!shouldCloseForMicroTarget({ grossPnl: 2.1, costs, targetNetUsd: 2 }).close, 'No debe cerrar por grossPnl si netPnl no alcanza target.')
 
-assert.strictEqual(getMicroProfitCostLimits(2).maxSpreadCostUsd, 0.7, 'Target $2 debe permitir spreadCost max $0.70 en modo demo agresivo.')
-assert.strictEqual(getMicroProfitCostLimits(2).maxTotalEstimatedCostUsd, 1.1, 'Target $2 debe permitir costo total max $1.10 en modo demo agresivo.')
-assert.strictEqual(getMicroProfitCostLimits(3).maxSpreadCostUsd, 1.05, 'Target $3 debe permitir spreadCost max $1.05 en modo demo agresivo.')
-assert.strictEqual(getMicroProfitCostLimits(3).maxTotalEstimatedCostUsd, 1.65, 'Target $3 debe permitir costo total max $1.65 en modo demo agresivo.')
+assert.strictEqual(getMicroProfitCostLimits(2).maxSpreadCostUsd, 0.4, 'Target $2 debe permitir spreadCost max $0.40.')
+assert.strictEqual(getMicroProfitCostLimits(2).maxTotalEstimatedCostUsd, 0.6, 'Target $2 debe permitir costo total max $0.60.')
+assert.strictEqual(getMicroProfitCostLimits(3).maxSpreadCostUsd, 0.6, 'Target $3 debe permitir spreadCost max $0.60.')
+assert.strictEqual(getMicroProfitCostLimits(3).maxTotalEstimatedCostUsd, 0.9, 'Target $3 debe permitir costo total max $0.90.')
 
 const expensiveForTwo = validateMicroProfitCosts({
-  costs: { commission: 0, costToProfitRatio: 0.56, slippageEstimate: 0.1, spreadCost: 0.31, swapAccrued: 0, totalEstimatedCost: 1.11 },
+  costs: { commission: 0, costToProfitRatio: 0.31, slippageEstimate: 0.1, spreadCost: 0.31, swapAccrued: 0, totalEstimatedCost: 0.61 },
   expectedNetProfit: 2,
   targetNetUsd: 2,
 })
-assert(!expensiveForTwo.approved, 'Para target $2 debe bloquear si totalEstimatedCost > $1.10.')
+assert(!expensiveForTwo.approved, 'Para target $2 debe bloquear si totalEstimatedCost > $0.60.')
 
 const expensiveForThree = validateMicroProfitCosts({
-  costs: { commission: 0, costToProfitRatio: 0.56, slippageEstimate: 0.1, spreadCost: 0.5, swapAccrued: 0, totalEstimatedCost: 1.66 },
+  costs: { commission: 0, costToProfitRatio: 0.31, slippageEstimate: 0.1, spreadCost: 0.5, swapAccrued: 0, totalEstimatedCost: 0.91 },
   expectedNetProfit: 3,
   targetNetUsd: 3,
 })
-assert(!expensiveForThree.approved, 'Para target $3 debe bloquear si totalEstimatedCost > $1.65.')
+assert(!expensiveForThree.approved, 'Para target $3 debe bloquear si totalEstimatedCost > $0.90.')
 
 const safety = getSafetyConfig()
 assert.strictEqual(safety.realTradingAllowed, false, 'realTradingAllowed debe seguir false.')

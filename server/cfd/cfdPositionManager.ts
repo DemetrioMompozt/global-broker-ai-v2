@@ -20,6 +20,18 @@ export async function updateOpenPositions() {
       updated.push({ ...position, managementStatus: 'DATA_WATCH', nextAction: 'WAIT_PRICE' })
       continue
     }
+    const referencePrice = Number.isFinite(position.currentPrice) && position.currentPrice > 0 ? position.currentPrice : position.entryPrice
+    const maxTickMoveRatio = position.assetClass === 'CRYPTO_CFD' ? 0.25 : 0.05
+    const tickMoveRatio = Math.abs(currentPrice - referencePrice) / Math.max(referencePrice, 0.000001)
+    if (tickMoveRatio > maxTickMoveRatio) {
+      updated.push({
+        ...position,
+        managementStatus: 'PRICE_OUTLIER_REJECTED',
+        nextAction: 'WAIT_VALID_PRICE',
+        lastPriceUpdate: new Date().toISOString(),
+      })
+      continue
+    }
     const openPnl = position.direction === 'LONG'
       ? (currentPrice - position.entryPrice) * position.positionSize
       : (position.entryPrice - currentPrice) * position.positionSize

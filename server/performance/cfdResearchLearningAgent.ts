@@ -7,6 +7,7 @@ import { buildLossAttribution } from './lossAttributionEngine.js'
 import { buildTargetFeasibility } from './targetFeasibilityAnalyzer.js'
 import { buildLeverageDamage } from './leverageDamageAnalyzer.js'
 import { getWeekendLearningCampaignStatus } from '../learning/weekendLearningCampaign.js'
+import { getProfessionalTradingLibrarySkillStatus, getProfessionalTradingLibrarySystemPrompt } from '../learning/professionalTradingLibrarySkill.js'
 
 export type ResearchLearningRuleProposal = {
   confidence: 'LOW' | 'MEDIUM' | 'HIGH'
@@ -21,9 +22,10 @@ export type ResearchLearningStatus = {
   configured: boolean
   model: string
   webSearchEnabled: boolean
-  status: 'NOT_CONFIGURED' | 'DISABLED' | 'IDLE' | 'RUNNING' | 'READY' | 'ERROR'
+  status: 'NOT_CONFIGURED' | 'DISABLED' | 'IDLE' | 'RUNNING' | 'READY' | 'ERROR' | 'QUOTA_EXCEEDED'
   lastRunAt: string | null
   nextRunAt: string | null
+  pausedUntil: string | null
   trigger: string | null
   summary: string
   techniquesResearched: string[]
@@ -59,9 +61,11 @@ const enabled = boolEnv('CFD_RESEARCH_ENABLED', true)
 const webSearchEnabled = boolEnv('CFD_RESEARCH_WEB_SEARCH_ENABLED', true)
 const intervalMinutes = Math.max(5, numEnv('CFD_RESEARCH_INTERVAL_MINUTES', 30))
 const timeoutMs = Math.max(5_000, numEnv('CFD_RESEARCH_TIMEOUT_MS', 120_000))
+const quotaPauseHours = Math.max(1, numEnv('CFD_RESEARCH_QUOTA_PAUSE_HOURS', 24))
 
 let lastStatus: ResearchLearningStatus = buildBaseStatus()
 let running: Promise<ResearchLearningStatus> | null = null
+let quotaPausedUntilMs = 0
 
 function apiKey() {
   return process.env.OPENAI_API_KEY ?? ''
@@ -78,6 +82,7 @@ function buildBaseStatus(overrides: Partial<ResearchLearningStatus> = {}): Resea
     status,
     lastRunAt: null,
     nextRunAt: enabled && configured ? new Date(Date.now() + intervalMinutes * 60_000).toISOString() : null,
+    pausedUntil: null,
     trigger: null,
     summary: configured
       ? 'GPT research learning listo para analizar resultados cuando se ejecute.'
@@ -99,6 +104,34 @@ function buildBaseStatus(overrides: Partial<ResearchLearningStatus> = {}): Resea
     },
     ...overrides,
   }
+}
+
+export function isOpenAiQuotaError(message: string) {
+  const lower = message.toLowerCase()
+  return lower.includes('429')
+    || lower.includes('insufficient_quota')
+    || lower.includes('exceeded your current quota')
+    || lower.includes('billing details')
+}
+
+function quotaExceededStatus(trigger: string, rawMessage: string): ResearchLearningStatus {
+  quotaPausedUntilMs = Date.now() + quotaPauseHours * 60 * 60 * 1000
+  const pausedUntil = new Date(quotaPausedUntilMs).toISOString()
+  return buildBaseStatus({
+    configured: true,
+    error: rawMessage,
+    lastRunAt: new Date().toISOString(),
+    nextRunAt: pausedUntil,
+    pausedUntil,
+    riskWarnings: [
+      'OPENAI_API_KEY sin cuota disponible: GPT research queda pausado para no repetir llamadas fallidas.',
+      'El agente paper sigue operando con aprendizaje local, Professional Trading Library Skill, velas, VT/Binance y safety guards.',
+    ],
+    status: 'QUOTA_EXCEEDED',
+    summary: 'GPT Research pausado: la API de OpenAI respondio quota/billing insuficiente. Revisa billing/cuota o cambia la API key; no afecta paper trading.',
+    trigger,
+    nextExperiment: 'Restaurar cuota de OpenAI o actualizar OPENAI_API_KEY; luego reiniciar o esperar a que expire la pausa.',
+  })
 }
 
 function recentClosedTrades(trades = getClosedTrades()) {
@@ -181,12 +214,14 @@ function buildResearchContext() {
       lossAttribution: buildLossAttribution(),
       targetFeasibility: buildTargetFeasibility(),
       leverageDamage: buildLeverageDamage(),
+      professionalTradingLibrarySkill: getProfessionalTradingLibrarySkillStatus(),
       weekendShadowLearningCampaign: getWeekendLearningCampaignStatus(),
       bySymbol: summarizeBy(todayClosed, (trade) => trade.cfdSymbol),
       byStrategy: summarizeBy(todayClosed, (trade) => trade.strategy),
       byCandlePattern: summarizeBy(todayClosed, (trade) => trade.candlePatternAtEntry ?? 'UNKNOWN_CANDLE'),
     },
     instructions: [
+      getProfessionalTradingLibrarySystemPrompt(),
       'Busca y contrasta tecnicas de trading CFD, comportamiento de velas, microestructura, spreads, breakout failures, rejection candles y session behavior.',
       'No recomiendes aumentar riesgo como solucion primaria.',
       'No propongas order_send ni trading real.',
@@ -330,11 +365,27 @@ export async function runCfdResearchLearningNow(trigger = 'manual') {
     lastStatus = buildBaseStatus()
     return lastStatus
   }
+  if (quotaPausedUntilMs > Date.now()) {
+    lastStatus = {
+      ...lastStatus,
+      configured: true,
+      status: 'QUOTA_EXCEEDED',
+      nextRunAt: new Date(quotaPausedUntilMs).toISOString(),
+      pausedUntil: new Date(quotaPausedUntilMs).toISOString(),
+      trigger,
+      summary: 'GPT Research sigue pausado por cuota insuficiente; no se hace otra llamada a OpenAI todavia.',
+    }
+    return lastStatus
+  }
   if (running) return running
   lastStatus = { ...lastStatus, configured: true, status: 'RUNNING', trigger, summary: 'GPT-5.5 esta investigando resultados, velas, costos y tecnicas CFD.' }
   running = requestOpenAiResearch(trigger)
     .catch((error) => {
       const message = error instanceof Error ? error.message : String(error)
+      if (isOpenAiQuotaError(message)) {
+        lastStatus = quotaExceededStatus(trigger, message)
+        return lastStatus
+      }
       lastStatus = buildBaseStatus({
         configured: true,
         status: 'ERROR',
@@ -359,6 +410,7 @@ export async function runCfdResearchLearningNow(trigger = 'manual') {
 
 export function maybeRunCfdResearchLearning(trigger = 'scheduled') {
   if (!enabled || !apiKey() || running) return lastStatus
+  if (quotaPausedUntilMs > Date.now()) return lastStatus
   if (!lastStatus.lastRunAt) {
     void runCfdResearchLearningNow(trigger)
     return lastStatus

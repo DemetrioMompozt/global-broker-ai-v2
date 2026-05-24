@@ -1,3 +1,4 @@
+import { numEnv } from '../config/env.js'
 import { getClosedTrades, getOpenPositions } from '../storage/tradeStore.js'
 import type { AccountSnapshot } from './accountHealthGuard.js'
 
@@ -17,6 +18,11 @@ export type DefensiveDiagnosticState = {
 let manualOverrideActive = false
 let recoveryProbeActive = true
 let manualReason = 'Activado manualmente por perdidas persistentes reportadas por el usuario.'
+let manualActivatedAt = 0
+
+function maxDiagnosticSeconds() {
+  return Math.max(120, numEnv('DEFENSIVE_DIAGNOSTIC_MAX_SECONDS', 180))
+}
 
 function todayClosedTrades() {
   const today = new Date().toISOString().slice(0, 10)
@@ -50,6 +56,7 @@ export function activateDefensiveDiagnosticMode(reason = 'Perdidas persistentes 
   manualOverrideActive = true
   recoveryProbeActive = false
   manualReason = reason
+  manualActivatedAt = Date.now()
 }
 
 export function activateRecoveryProbeMode(reason = 'Punto medio activado: entradas paper limitadas para medir edge sin volver al modo agresivo.') {
@@ -68,6 +75,14 @@ export function getDefensiveDiagnosticMode(account: AccountSnapshot): DefensiveD
   const softReasons: string[] = []
   const hardReasons: string[] = []
 
+  const manualExpired = manualOverrideActive
+    && manualActivatedAt > 0
+    && Date.now() - manualActivatedAt > maxDiagnosticSeconds() * 1000
+  if (manualExpired) {
+    manualOverrideActive = false
+    recoveryProbeActive = true
+    manualReason = 'Diagnostico defensivo expiro automaticamente; pasar a recovery probe controlado para que el agente no quede congelado.'
+  }
   if (manualOverrideActive) reasons.push(manualReason)
   if (netPnlToday < 0 && closedToday.length >= 5) softReasons.push(`P/L neto hoy negativo con ${closedToday.length} cierres.`)
   if (closedToday.length >= 10 && pf < 1) softReasons.push(`Profit Factor ${pf.toFixed(2)} menor a 1.0.`)

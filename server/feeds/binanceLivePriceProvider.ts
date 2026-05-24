@@ -1,7 +1,7 @@
 import { recordCryptoTick } from '../strategy/cryptoCandleBuilder.js'
 import type { ProviderStatus } from './feedTypes.js'
 
-type BinanceMessage = { data?: { a?: string; b?: string; p?: string; q?: string; s?: string; T?: number; u?: number } }
+type BinanceMessage = { data?: { a?: string; b?: string; E?: number; p?: string; q?: string; s?: string; T?: number; u?: number } }
 
 export type BinanceLivePrice = {
   symbol: string
@@ -111,7 +111,7 @@ function connect() {
       try {
         const data = JSON.parse(String(event.data)) as BinanceMessage
         if (data.data?.s && data.data.p) updateTrade(data.data.s, data.data.p, data.data.q, data.data.T)
-        if (data.data?.s && data.data.b && data.data.a) updateBook(data.data.s, data.data.b, data.data.a, data.data.u)
+        if (data.data?.s && data.data.b && data.data.a) updateBook(data.data.s, data.data.b, data.data.a, data.data.E)
       } catch (error) {
         lastError = error instanceof Error ? error.message : String(error)
       }

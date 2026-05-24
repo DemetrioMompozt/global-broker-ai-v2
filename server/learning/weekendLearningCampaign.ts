@@ -60,8 +60,8 @@ function numEnv(name: string, fallback: number) {
 }
 
 export const weekendLearningCampaignConfig = {
-  enabled: boolEnv('WEEKEND_LEARNING_CAMPAIGN_ENABLED', false),
-  targetSamples: numEnv('WEEKEND_LEARNING_CAMPAIGN_TARGET_SAMPLES', 200),
+  enabled: boolEnv('WEEKEND_LEARNING_CAMPAIGN_ENABLED', true),
+  targetSamples: numEnv('WEEKEND_LEARNING_CAMPAIGN_TARGET_SAMPLES', 1000),
   maxConcurrentSamples: numEnv('WEEKEND_LEARNING_CAMPAIGN_MAX_CONCURRENT', 12),
   minScore: numEnv('WEEKEND_LEARNING_CAMPAIGN_MIN_SCORE', 60),
   minCfdExpertScore: numEnv('WEEKEND_LEARNING_CAMPAIGN_MIN_CFD_SCORE', 60),

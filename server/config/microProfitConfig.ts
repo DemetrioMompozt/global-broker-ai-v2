@@ -17,8 +17,8 @@ export const microProfitConfig = {
   cooldownAfterLossSeconds: numEnv('MICRO_PROFIT_COOLDOWN_AFTER_LOSS_SECONDS', 120),
   cooldownAfterWinSeconds: numEnv('MICRO_PROFIT_COOLDOWN_AFTER_WIN_SECONDS', 20),
   maxHoldSeconds: numEnv('MICRO_PROFIT_MAX_HOLD_SECONDS', 300),
-  maxSpreadCostRatio: 0.35,
-  maxTotalCostRatio: 0.55,
+  maxSpreadCostRatio: 0.2,
+  maxTotalCostRatio: 0.3,
 }
 
 let activeTargetNetUsd = normalizeTarget(numEnv('MICRO_PROFIT_TARGET_NET_USD', microProfitConfig.defaultTargetNetUsd))

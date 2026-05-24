@@ -14,5 +14,11 @@ export function getPerformanceGuardStatus() {
       reason: `PF ${profitFactor.toFixed(2)} debil, pero perdida neta $${Math.abs(netPnl).toFixed(2)} sigue dentro del presupuesto demo. Continuar con filtro direccional y stop de perdida.`,
     }
   }
-  return profitFactor >= 1 ? { status: 'APPROVED' as const, reason: `PF ${profitFactor.toFixed(2)} permitido.` } : { status: 'BLOCKED' as const, reason: `PF ${profitFactor.toFixed(2)} menor a 1.0.` }
+  if (profitFactor < 1) {
+    return {
+      status: 'APPROVED' as const,
+      reason: `PF ${profitFactor.toFixed(2)} menor a 1.0 y perdida demo $${Math.abs(netPnl).toFixed(2)}. Modo paper nunca se apaga: continuar solo con probes controlados, watchdog y aprendizaje; sin dinero real.`,
+    }
+  }
+  return { status: 'APPROVED' as const, reason: `PF ${profitFactor.toFixed(2)} permitido.` }
 }

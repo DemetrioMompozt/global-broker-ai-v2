@@ -2,7 +2,7 @@ import type { CfdResearchLearningStatus } from '../../types/trading'
 
 function tone(status: CfdResearchLearningStatus['status']) {
   if (status === 'READY') return 'gain'
-  if (status === 'ERROR' || status === 'NOT_CONFIGURED') return 'loss'
+  if (status === 'ERROR' || status === 'NOT_CONFIGURED' || status === 'QUOTA_EXCEEDED') return 'loss'
   return ''
 }
 
@@ -11,6 +11,7 @@ function label(status: CfdResearchLearningStatus['status']) {
   if (status === 'DISABLED') return 'Desactivado'
   if (status === 'RUNNING') return 'Investigando'
   if (status === 'READY') return 'Aprendizaje listo'
+  if (status === 'QUOTA_EXCEEDED') return 'GPT pausado por cuota'
   if (status === 'ERROR') return 'Error de investigacion'
   return 'En espera'
 }
@@ -23,6 +24,7 @@ const fallbackLearning: CfdResearchLearningStatus = {
   status: 'NOT_CONFIGURED',
   lastRunAt: null,
   nextRunAt: null,
+  pausedUntil: null,
   trigger: null,
   summary: 'El API aun no devolvio el estado de GPT-5.5 research learning. Reinicia el servidor o espera el siguiente refresh.',
   techniquesResearched: [],
@@ -55,7 +57,7 @@ export function CFDResearchLearningPanel({ learning: incomingLearning }: { learn
         </div>
         <div className="auto-status-card">
           <span>Investigacion automatica</span>
-          <strong>{learning.status === 'RUNNING' ? 'En curso' : learning.configured ? 'Programada' : 'Pendiente'}</strong>
+          <strong>{learning.status === 'RUNNING' ? 'En curso' : learning.status === 'QUOTA_EXCEEDED' ? 'Pausada' : learning.configured ? 'Programada' : 'Pendiente'}</strong>
           <small>GPT-5.5 revisa por intervalo; no opera ni envia ordenes.</small>
         </div>
       </div>
@@ -63,12 +65,16 @@ export function CFDResearchLearningPanel({ learning: incomingLearning }: { learn
         <span>Modelo: <strong>{learning.model}</strong></span>
         <span>Web search: <strong>{learning.webSearchEnabled ? 'activo' : 'apagado'}</strong></span>
         <span>Ultima revision: <strong>{learning.lastRunAt ? new Date(learning.lastRunAt).toLocaleTimeString() : 'pendiente'}</strong></span>
+        <span>Pausa: <strong>{learning.pausedUntil ? `hasta ${new Date(learning.pausedUntil).toLocaleTimeString()}` : 'no'}</strong></span>
         <span>Permiso operativo: <strong>research only</strong></span>
       </div>
       {!learning.configured ? (
         <p className="warning">Falta OPENAI_API_KEY en el servidor. GPT-5.5 no se ejecuta hasta configurarlo; la app sigue con aprendizaje local y paper safe.</p>
       ) : null}
       {learning.error ? <p className="warning">{learning.error}</p> : null}
+      {learning.status === 'QUOTA_EXCEEDED' ? (
+        <p className="warning">OpenAI no tiene cuota disponible. GPT Research queda pausado; el agente sigue paper/demo con aprendizaje local, biblioteca profesional, velas y safety guards.</p>
+      ) : null}
       <div className="two-column">
         <div className="subpanel">
           <div className="eyebrow">Hipotesis y velas</div>

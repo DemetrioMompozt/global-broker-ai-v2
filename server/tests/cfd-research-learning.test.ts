@@ -22,5 +22,7 @@ assert(status.safety.brokerExecutionEnabled === false, 'broker execution must st
 const manual = await research.runCfdResearchLearningNow('test')
 assert(manual.status === 'NOT_CONFIGURED', 'manual research should not run without OPENAI_API_KEY')
 assert(!JSON.stringify(manual).includes('sk-'), 'research status must not expose API keys')
+assert(research.isOpenAiQuotaError('OpenAI research request failed 429: insufficient_quota'), '429 insufficient quota must be classified.')
+assert(research.isOpenAiQuotaError('You exceeded your current quota, please check your plan and billing details.'), 'Billing quota messages must be classified.')
 
 done('cfd-research-learning')

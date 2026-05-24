@@ -18,9 +18,12 @@ import { AgentEffectivenessMonitor } from './components/dashboard/AgentEffective
 import { CFDTraderSkillPanel } from './components/dashboard/CFDTraderSkillPanel'
 import { DefensiveDiagnosticMode } from './components/dashboard/DefensiveDiagnosticMode'
 import { LossAttributionPanel } from './components/dashboard/LossAttributionPanel'
+import { LossPatternFirewallPanel } from './components/dashboard/LossPatternFirewallPanel'
 import { AgentLearningPanel } from './components/dashboard/AgentLearningPanel'
 import { CFDResearchLearningPanel } from './components/dashboard/CFDResearchLearningPanel'
+import { ProfessionalTradingLibraryPanel } from './components/dashboard/ProfessionalTradingLibraryPanel'
 import { LearningCampaignMonitor } from './components/dashboard/LearningCampaignMonitor'
+import { ProfessionalSystemAudit } from './components/dashboard/ProfessionalSystemAudit'
 
 export default function App() {
   const { status, error, lastRefresh } = useAutonomousStatus()
@@ -39,14 +42,17 @@ export default function App() {
       <Header />
       <AccountSummary account={status.account} />
       <HeroAgentStatus status={status} />
+      <ProfessionalSystemAudit audit={status.professionalAudit} watchdog={status.noPositionWatchdog} />
       <DefensiveDiagnosticMode diagnostic={status.defensiveDiagnostic} />
       <AgentLearningPanel learning={status.adaptiveLearning} />
+      <ProfessionalTradingLibraryPanel library={status.professionalTradingLibrarySkill} />
       <CFDResearchLearningPanel learning={status.cfdResearchLearning} />
       <LearningCampaignMonitor campaign={status.learningCampaign} />
+      <LossPatternFirewallPanel firewall={status.lossPatternFirewall} />
       <LossAttributionPanel attribution={status.lossAttribution} leverage={status.leverageDamage} target={status.targetFeasibility} />
       <CFDTraderSkillPanel skill={status.cfdTraderSkill} />
       <TraderDecisionEngine decision={status.traderDecision} />
-      <AgentEffectivenessMonitor effectiveness={status.agentEffectiveness} />
+      <AgentEffectivenessMonitor effectiveness={status.agentEffectiveness} firewall={status.lossPatternFirewall} learningCampaign={status.learningCampaign} />
       <MicroProfitPanel microProfit={status.microProfit} />
       <div className="refresh-line">UI refresh: {lastRefresh ? new Date(lastRefresh).toLocaleTimeString() : 'pendiente'} · Server: {new Date(status.serverTime).toLocaleTimeString()}</div>
       <OpenCfdPositions maxPositions={status.limits?.maxTotalOpenPositions ?? 10} positions={status.openPositions} />

@@ -1,4 +1,4 @@
-import type { AgentEffectivenessStatus } from '../../types/trading'
+import type { AgentEffectivenessStatus, LearningCampaignStatus, LossPatternFirewallStatus } from '../../types/trading'
 
 const money = new Intl.NumberFormat('en-US', { currency: 'USD', style: 'currency', maximumFractionDigits: 4 })
 
@@ -8,12 +8,21 @@ function timeLabel(seconds: number | null) {
   return `${(seconds / 60).toFixed(1)}m`
 }
 
-export function AgentEffectivenessMonitor({ effectiveness }: { effectiveness: AgentEffectivenessStatus }) {
+export function AgentEffectivenessMonitor({
+  effectiveness,
+  firewall,
+  learningCampaign,
+}: {
+  effectiveness: AgentEffectivenessStatus
+  firewall?: LossPatternFirewallStatus
+  learningCampaign?: LearningCampaignStatus
+}) {
   const tone = effectiveness.status === 'EFFECTIVE'
     ? 'gain'
     : effectiveness.status === 'WEAK' || effectiveness.status === 'INEFFICIENT'
       ? 'loss'
       : ''
+  const shadowActive = Boolean(learningCampaign?.enabled && ((learningCampaign.openSamples ?? 0) > 0 || (learningCampaign.remainingSamples ?? 0) > 0))
 
   return (
     <section className="panel">
@@ -25,8 +34,20 @@ export function AgentEffectivenessMonitor({ effectiveness }: { effectiveness: Ag
         </div>
         <div className="big">Score {effectiveness.score}</div>
       </div>
+      {firewall?.active ? (
+        <p className="notice warning-soft">
+          Main paper protegido: {firewall.reason}
+        </p>
+      ) : null}
+      {shadowActive ? (
+        <p className="notice watchdog-active">
+          Agente aprendiendo en vivo: {learningCampaign?.openSamples ?? 0} muestras shadow abiertas, {learningCampaign?.completedSamples ?? 0}/{learningCampaign?.targetSamples ?? 0} cerradas. No toca balance ni margen.
+        </p>
+      ) : null}
       <div className="position-metrics">
-        <span>Abiertas: <strong>{effectiveness.openPositions}</strong></span>
+        <span>Main paper abiertas: <strong>{effectiveness.openPositions}</strong></span>
+        <span>Shadow abiertas: <strong>{learningCampaign?.openSamples ?? 0}</strong></span>
+        <span>Shadow cerradas: <strong>{learningCampaign?.completedSamples ?? 0}/{learningCampaign?.targetSamples ?? 0}</strong></span>
         <span>Cerradas hoy: <strong>{effectiveness.closedToday}</strong></span>
         <span>Targets $2: <strong>{effectiveness.targetHitsToday}</strong></span>
         <span>Cierres perdida: <strong>{effectiveness.closedByLossToday}</strong></span>

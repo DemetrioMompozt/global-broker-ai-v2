@@ -3,7 +3,7 @@ import { getOpenPositions, type CfdPosition } from '../storage/tradeStore.js'
 export const multiPositionLimits = {
   maxTotalOpenPositions: 10,
   maxVtOpenPositions: 8,
-  maxBinanceCryptoOpenPositions: 1,
+  maxBinanceCryptoOpenPositions: 4,
   maxPositionsPerAssetClass: 6,
   maxPositionsPerSymbol: 1,
   maxTotalOpenRiskPercent: 4.5,

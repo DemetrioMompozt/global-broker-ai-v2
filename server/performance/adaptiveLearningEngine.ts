@@ -69,6 +69,22 @@ function exceptionalReversal(opportunity: Opportunity) {
     && (opportunity.edgeEfficiency ?? 0) >= 0.65
 }
 
+function candleSignal(opportunity: Opportunity) {
+  const candle = opportunity.candleBehavior
+  if (typeof candle === 'object' && candle && 'signal' in candle && typeof candle.signal === 'string') return candle.signal
+  return null
+}
+
+function cryptoLearningEscape(opportunity: Opportunity) {
+  const isCrypto = opportunity.source === 'BINANCE_REALTIME' || opportunity.assetClass === 'CRYPTO_CFD'
+  if (!isCrypto) return false
+  if (opportunity.quote.feedType !== 'REALTIME_TICK') return false
+  if (opportunity.setupStatus === 'CANDLE_BLOCKED' || candleSignal(opportunity) === 'BLOCKS_ENTRY') return false
+  return (opportunity.opportunityScore ?? 0) >= 86
+    && (opportunity.cfdExpertScore ?? 0) >= 85
+    && (opportunity.expectedNetProfit ?? 0) >= getMicroProfitTargetNetUsd()
+}
+
 function buildWinningPatterns(): WinningPattern[] {
   const winners = todayClosedTrades().filter((trade) => trade.pnl > 0 || trade.exitReason === 'MICRO_CLOSE_TARGET')
   return [...groupBy(winners, (trade) => `${trade.cfdSymbol}|${trade.strategy}|${trade.direction}|${trade.source ?? 'UNKNOWN'}|${trade.candlePatternAtEntry ?? 'UNKNOWN_CANDLE'}`).entries()]
@@ -251,10 +267,11 @@ export function validateAdaptiveLearningGate(opportunity: Opportunity) {
   const learning = buildAdaptiveLearning()
   const reasons: string[] = []
   const exceptional = exceptionalReversal(opportunity)
+  const cryptoEscape = cryptoLearningEscape(opportunity)
   const winningPattern = matchingWinningPattern(opportunity, learning.winningPatterns)
 
   for (const rule of learning.rules) {
-    if ((rule.action === 'BAN_SYMBOL' || rule.action === 'SUSPEND_SYMBOL') && rule.target === opportunity.cfdSymbol && !exceptional && !winningPattern) {
+    if ((rule.action === 'BAN_SYMBOL' || rule.action === 'SUSPEND_SYMBOL') && rule.target === opportunity.cfdSymbol && !exceptional && !winningPattern && !cryptoEscape) {
       reasons.push(`learning ${rule.action}: ${rule.evidence} ${rule.solution}`)
     }
     if (rule.action === 'BLOCK_STRATEGY' && rule.target === opportunity.strategy && !exceptional && !winningPattern) {
@@ -272,6 +289,8 @@ export function validateAdaptiveLearningGate(opportunity: Opportunity) {
       ? `Adaptive learning bloquea ${opportunity.cfdSymbol}: ${reasons.join(' ')}`
       : winningPattern
         ? `Adaptive learning favorece ${opportunity.cfdSymbol}: coincide con patron ganador (${winningPattern.evidence})`
+        : cryptoEscape
+          ? `Adaptive learning permite crypto re-test en ${opportunity.cfdSymbol}: feed REALTIME_TICK, vela no bloqueante y target viable; no queda congelado por reglas de sesion.`
         : `Adaptive learning aprueba ${opportunity.cfdSymbol}: no viola reglas aprendidas de la sesion.`,
   }
 }

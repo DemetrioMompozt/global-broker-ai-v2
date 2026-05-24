@@ -34,7 +34,14 @@
     "test:trader-firewall": "tsx server/tests/trader-firewall.test.ts",
     "test:candle-behavior": "tsx server/tests/candle-behavior.test.ts",
     "test:controlled-probe": "tsx server/tests/controlled-probe-policy.test.ts",
-    "test:cfd-research-learning": "tsx server/tests/cfd-research-learning.test.ts"
+    "test:paper-pnl-integrity": "tsx server/tests/paper-pnl-integrity.test.ts",
+    "test:professional-system-audit": "tsx server/tests/professional-system-audit.test.ts",
+    "test:no-position-watchdog": "tsx server/tests/no-position-watchdog.test.ts",
+    "test:never-stop-paper": "tsx server/tests/never-stop-paper.test.ts",
+    "test:loss-pattern-firewall": "tsx server/tests/loss-pattern-firewall.test.ts",
+    "test:cfd-research-learning": "tsx server/tests/cfd-research-learning.test.ts",
+    "test:professional-trading-library": "tsx server/tests/professional-trading-library-skill.test.ts",
+    "test:crypto-candle-integrity": "tsx server/tests/crypto-candle-integrity.test.ts"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^6.0.1",
