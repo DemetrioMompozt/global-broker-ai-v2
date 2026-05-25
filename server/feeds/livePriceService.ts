@@ -1,5 +1,5 @@
 import { resolveSymbol } from '../symbols/symbolMappingService.js'
-import { getBinanceLivePrice, getBinanceStatus } from './binanceLivePriceProvider.js'
+import { getBinanceLivePrice, getBinanceStatus, isReasonableBinanceCryptoQuote, isReasonableBinanceCryptoPrice } from './binanceLivePriceProvider.js'
 import type { LivePrice } from './feedTypes.js'
 
 const previous = new Map<string, number>()
@@ -26,13 +26,16 @@ async function binanceRest(symbol: string) {
         const bid = Number(payload.bidPrice)
         const ask = Number(payload.askPrice)
         if (Number.isFinite(bid) && bid > 0 && Number.isFinite(ask) && ask > bid) {
+          const price = (bid + ask) / 2
+          const sanity = isReasonableBinanceCryptoQuote(symbol, { bid, ask, price })
+          if (!sanity.ok) continue
           return {
             ask,
             bid,
-            price: (bid + ask) / 2,
+            price,
             provider: `${provider.name} bookTicker`,
             spread: ask - bid,
-            spreadBps: (ask - bid) / ((bid + ask) / 2) * 10_000,
+            spreadBps: (ask - bid) / price * 10_000,
           }
         }
       }
@@ -40,7 +43,7 @@ async function binanceRest(symbol: string) {
       if (response.ok) {
         const payload = await response.json() as { price?: string }
         const price = Number(payload.price)
-        if (Number.isFinite(price) && price > 0) return { price, provider: provider.name }
+        if (Number.isFinite(price) && price > 0 && isReasonableBinanceCryptoPrice(symbol, price)) return { price, provider: provider.name }
       }
     } catch {
       // Try the next public endpoint.

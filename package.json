@@ -41,7 +41,8 @@
     "test:loss-pattern-firewall": "tsx server/tests/loss-pattern-firewall.test.ts",
     "test:cfd-research-learning": "tsx server/tests/cfd-research-learning.test.ts",
     "test:professional-trading-library": "tsx server/tests/professional-trading-library-skill.test.ts",
-    "test:crypto-candle-integrity": "tsx server/tests/crypto-candle-integrity.test.ts"
+    "test:crypto-candle-integrity": "tsx server/tests/crypto-candle-integrity.test.ts",
+    "test:binance-price-sanity": "tsx server/tests/binance-price-sanity.test.ts"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^6.0.1",

@@ -14,6 +14,7 @@ import { validatePortfolioRiskGuard } from '../risk/portfolioRiskGuard.js'
 import { validateRiskGuard } from '../risk/riskGuard.js'
 import { validateCryptoOvertradingGuard, recordCryptoOpen } from '../risk/cryptoOvertradingGuard.js'
 import { validateMultiPositionPortfolioPolicy } from '../risk/multiPositionPortfolioPolicy.js'
+import { isReasonableBinanceCryptoQuote } from '../feeds/binanceLivePriceProvider.js'
 
 function desiredTargetMoveBps(assetClass: AssetClass) {
   if (assetClass === 'FOREX_CFD') return 2.5
@@ -42,6 +43,15 @@ export async function openCfdPaperPosition(
   }
   const direction = opportunity.direction ?? 'LONG'
   const entryPrice = direction === 'LONG' ? opportunity.quote.ask : opportunity.quote.bid
+  if (instrument.assetClass === 'CRYPTO_CFD') {
+    const cryptoQuote = isReasonableBinanceCryptoQuote(instrument.underlyingSymbol, {
+      ask: opportunity.quote.ask,
+      bid: opportunity.quote.bid,
+      price: opportunity.quote.mid,
+    })
+    if (!cryptoQuote.ok) return { opened: false, reason: `Precio cripto rechazado antes de abrir: ${cryptoQuote.reason}`, expert: undefined }
+  }
+  if (!Number.isFinite(entryPrice) || entryPrice <= 0) return { opened: false, reason: 'Precio de entrada invalido; no se abre paper trade.', expert: undefined }
   const requestedRiskPercent = instrument.assetClass === 'CRYPTO_CFD' ? tradingConfig.riskPerCryptoTradePercent : tradingConfig.riskPerTradePercent
   const openPositions = getOpenPositions()
   const openPnl = openPositions.reduce((sum, position) => sum + position.openPnl, 0)

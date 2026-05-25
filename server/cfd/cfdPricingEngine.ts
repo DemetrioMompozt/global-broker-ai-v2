@@ -1,5 +1,6 @@
 import type { LivePrice } from '../feeds/feedTypes.js'
 import { getLivePrice } from '../feeds/livePriceService.js'
+import { isReasonableBinanceCryptoQuote } from '../feeds/binanceLivePriceProvider.js'
 import { getVtMarketsCfdPrice } from '../feeds/vtMarketsPriceProvider.js'
 import { getCfdInstrument } from '../symbols/cfdInstrumentRegistry.js'
 
@@ -67,6 +68,34 @@ export async function getCfdQuote(cfdSymbol: string): Promise<CfdQuote> {
     }
   }
   const live = await getLivePrice(instrument?.underlyingSymbol ?? cfdSymbol)
+  if (instrument?.assetClass === 'CRYPTO_CFD') {
+    const sanity = isReasonableBinanceCryptoQuote(live.mappedSymbol, { price: live.price, bid: live.bid, ask: live.ask }, live.previousPrice)
+    if (!sanity.ok) {
+      return {
+        cfdSymbol: instrument.cfdSymbol,
+        underlyingSymbol: instrument.underlyingSymbol,
+        bid: 0,
+        ask: 0,
+        mid: 0,
+        spread: 0,
+        spreadBps: 0,
+        provider: 'Binance rejected invalid crypto quote',
+        feedType: 'ERROR',
+        pricingQuality: 'ERROR',
+        lastPriceUpdate: new Date().toISOString(),
+        sourcePrice: {
+          ...live,
+          price: 0,
+          previousPrice: 0,
+          change: 0,
+          changePercent: 0,
+          isDynamicPriceAvailable: false,
+          validForPaperPositionTracking: false,
+          message: sanity.reason,
+        },
+      }
+    }
+  }
   const fallbackSpreadBps = instrument?.assetClass === 'CRYPTO_CFD' ? 10 : 5
   const spreadBps = Number.isFinite(live.spreadBps) && (live.spreadBps ?? 0) > 0 ? live.spreadBps! : fallbackSpreadBps
   const spread = Number.isFinite(live.spread) && (live.spread ?? 0) > 0 ? live.spread! : live.price > 0 ? live.price * spreadBps / 10_000 : 0
