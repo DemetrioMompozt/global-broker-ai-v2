@@ -26,7 +26,7 @@ import { LearningCampaignMonitor } from './components/dashboard/LearningCampaign
 import { ProfessionalSystemAudit } from './components/dashboard/ProfessionalSystemAudit'
 
 export default function App() {
-  const { status, error, lastRefresh } = useAutonomousStatus()
+  const { status, error, lastRefresh, refresh } = useAutonomousStatus()
 
   if (!status) {
     return (
@@ -55,7 +55,7 @@ export default function App() {
       <AgentEffectivenessMonitor effectiveness={status.agentEffectiveness} firewall={status.lossPatternFirewall} learningCampaign={status.learningCampaign} />
       <MicroProfitPanel microProfit={status.microProfit} />
       <div className="refresh-line">UI refresh: {lastRefresh ? new Date(lastRefresh).toLocaleTimeString() : 'pendiente'} · Server: {new Date(status.serverTime).toLocaleTimeString()}</div>
-      <OpenCfdPositions maxPositions={status.limits?.maxTotalOpenPositions ?? 10} positions={status.openPositions} />
+      <OpenCfdPositions maxPositions={status.limits?.maxTotalOpenPositions ?? 10} onClosed={refresh} positions={status.openPositions} />
       <OpportunityWatchlist opportunities={status.opportunities} blocked={status.blockedOpportunities} />
       <CFDExpertPanel evaluation={status.cfdExpert.lastEvaluation} />
       <RealtimeReadiness feeds={status.feeds} />

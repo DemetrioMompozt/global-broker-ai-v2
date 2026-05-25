@@ -50,6 +50,8 @@ export function AgentEffectivenessMonitor({
         <span>Shadow cerradas: <strong>{learningCampaign?.completedSamples ?? 0}/{learningCampaign?.targetSamples ?? 0}</strong></span>
         <span>Cerradas hoy: <strong>{effectiveness.closedToday}</strong></span>
         <span>Targets $2: <strong>{effectiveness.targetHitsToday}</strong></span>
+        <span>Positivas sin $2: <strong>{effectiveness.partialProfitClosuresToday ?? 0}</strong></span>
+        <span>P/L parcial sin $2: <strong>{money.format(effectiveness.partialProfitPnlToday ?? 0)}</strong></span>
         <span>Cierres perdida: <strong>{effectiveness.closedByLossToday}</strong></span>
         <span>Rotaciones: <strong>{effectiveness.rotationsToday}</strong></span>
         <span>Stale/time stop: <strong>{effectiveness.staleClosuresToday}</strong></span>

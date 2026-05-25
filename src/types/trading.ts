@@ -424,6 +424,8 @@ export type AgentEffectivenessStatus = {
   openPnl: number
   openPositions: number
   opportunitiesBlocked: number
+  partialProfitClosuresToday?: number
+  partialProfitPnlToday?: number
   principalBlockingReason: string | null
   principalClosureReason: string | null
   profitFactor: number | null

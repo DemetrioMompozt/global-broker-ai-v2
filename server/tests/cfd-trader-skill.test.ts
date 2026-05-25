@@ -103,6 +103,8 @@ const readout = buildCfdTraderSkillReadout({
     openPnl: -1.2,
     openPositions: 1,
     opportunitiesBlocked: 0,
+    partialProfitClosuresToday: 0,
+    partialProfitPnlToday: 0,
     principalBlockingReason: null,
     principalClosureReason: null,
     profitFactor: 0,

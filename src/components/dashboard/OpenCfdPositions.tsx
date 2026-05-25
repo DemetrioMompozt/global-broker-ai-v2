@@ -1,9 +1,22 @@
+import { useState } from 'react'
+import { closePosition } from '../../api/client'
 import type { CfdPosition } from '../../types/trading'
 
 const money = new Intl.NumberFormat('en-US', { currency: 'USD', style: 'currency', maximumFractionDigits: 4 })
 const num = new Intl.NumberFormat('en-US', { maximumFractionDigits: 6 })
 
-export function OpenCfdPositions({ maxPositions = 10, positions }: { maxPositions?: number; positions: CfdPosition[] }) {
+export function OpenCfdPositions({
+  maxPositions = 10,
+  onClosed,
+  positions,
+}: {
+  maxPositions?: number
+  onClosed?: () => Promise<void> | void
+  positions: CfdPosition[]
+}) {
+  const [confirmCloseId, setConfirmCloseId] = useState<string | null>(null)
+  const [closingId, setClosingId] = useState<string | null>(null)
+  const [closeError, setCloseError] = useState<string | null>(null)
   const totalPnl = positions.reduce((sum, position) => sum + position.openPnl, 0)
   const vtCount = positions.filter((position) => position.source === 'VT_MARKETS_MT5_DEMO').length
   const binanceCount = positions.filter((position) => position.source === 'BINANCE_REALTIME' || position.assetClass === 'CRYPTO_CFD').length
@@ -26,7 +39,20 @@ export function OpenCfdPositions({ maxPositions = 10, positions }: { maxPosition
                 <strong>{position.cfdSymbol}</strong>
                 <div className="muted">{position.direction} / {position.strategy} / {position.underlyingSymbol} / {position.source ?? position.provider}</div>
               </div>
-              <div className={position.openPnl >= 0 ? 'gain big' : 'loss big'}>{money.format(position.openPnl)}</div>
+              <div className="position-actions">
+                <div className={position.openPnl >= 0 ? 'gain big' : 'loss big'}>{money.format(position.openPnl)}</div>
+                <button
+                  className="danger"
+                  disabled={closingId === position.id}
+                  onClick={() => {
+                    setCloseError(null)
+                    setConfirmCloseId(position.id)
+                  }}
+                  type="button"
+                >
+                  {closingId === position.id ? 'Cerrando...' : 'Cerrar paper'}
+                </button>
+              </div>
             </div>
 
             <div className="position-risk-strip">
@@ -72,9 +98,38 @@ export function OpenCfdPositions({ maxPositions = 10, positions }: { maxPosition
               {position.lastBrokerTickTime ? <span>Hora broker: {new Date(position.lastBrokerTickTime).toLocaleTimeString()}</span> : null}
             </div>
             <p className="reason">{position.professionalSkillReason ?? position.cfdExpertReason}</p>
+            {confirmCloseId === position.id ? (
+              <div className="manual-close-confirm">
+                <span>Esto cierra solo la posicion paper interna. No envia orden real.</span>
+                <button
+                  className="danger"
+                  disabled={closingId === position.id}
+                  onClick={async () => {
+                    setClosingId(position.id)
+                    setCloseError(null)
+                    try {
+                      await closePosition(position.id)
+                      setConfirmCloseId(null)
+                      await onClosed?.()
+                    } catch (error) {
+                      setCloseError(error instanceof Error ? error.message : String(error))
+                    } finally {
+                      setClosingId(null)
+                    }
+                  }}
+                  type="button"
+                >
+                  Confirmar cierre paper
+                </button>
+                <button className="secondary" disabled={closingId === position.id} onClick={() => setConfirmCloseId(null)} type="button">
+                  Cancelar
+                </button>
+              </div>
+            ) : null}
           </article>
         ))}
       </div>
+      {closeError ? <p className="warning">{closeError}</p> : null}
     </section>
   )
 }

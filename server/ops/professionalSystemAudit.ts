@@ -63,6 +63,11 @@ export function buildProfessionalSystemAudit(input: ProfessionalSystemAuditInput
   const checks: ReturnType<typeof check>[] = []
   const automaticActions: string[] = []
   const closedPnlFromJournal = input.closedTrades.reduce((sum, trade) => sum + trade.pnl, 0)
+  const today = new Date().toISOString().slice(0, 10)
+  const todayClosedTrades = input.closedTrades.filter((trade) => trade.closedAt.startsWith(today))
+  const todayTargetHits = todayClosedTrades.filter((trade) => trade.exitReason === 'MICRO_CLOSE_TARGET')
+  const todayPartialProfit = todayClosedTrades.filter((trade) => trade.pnl > 0 && trade.exitReason !== 'MICRO_CLOSE_TARGET')
+  const todayPartialProfitPnl = todayPartialProfit.reduce((sum, trade) => sum + trade.pnl, 0)
   const expectedBalance = tradingConfig.initialBalance + closedPnlFromJournal
   const accountFinite = [
     input.account.balance,
@@ -159,6 +164,26 @@ export function buildProfessionalSystemAudit(input: ProfessionalSystemAuditInput
     'Position limits',
     tooManyPositions ? 'FAIL' : 'PASS',
     `${input.openPositions.length}/${tradingConfig.maxOpenPositions} posiciones paper abiertas.`,
+  ))
+
+  checks.push(check(
+    'target_accounting',
+    'Target accounting',
+    todayClosedTrades.length > 0 && todayTargetHits.length === 0 ? 'WATCH' : 'PASS',
+    todayClosedTrades.length === 0
+      ? 'Sin cierres hoy: aun no hay resultado realizado que auditar contra target $2.'
+      : todayTargetHits.length > 0
+        ? `${todayTargetHits.length} cierre(s) alcanzaron target neto $2.`
+        : `Closed P/L incluye ${money(todayPartialProfitPnl)} de cierres positivos parciales, pero 0 cierres llegaron al target $2.`,
+  ))
+
+  checks.push(check(
+    'equity_vs_realized',
+    'Equity vs realized',
+    input.account.closedPnl > 0 && input.account.openPnl < -Math.max(0.5, input.account.closedPnl * 0.5) ? 'WATCH' : 'PASS',
+    input.account.closedPnl > 0 && input.account.openPnl < 0
+      ? `Balance realizado positivo ${money(input.account.closedPnl)}, pero P/L abierto ${money(input.account.openPnl)} reduce equity actual.`
+      : `Equity coherente con P/L cerrado ${money(input.account.closedPnl)} y abierto ${money(input.account.openPnl)}.`,
   ))
 
   const failed = checks.filter((item) => item.status === 'FAIL')

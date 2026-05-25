@@ -884,14 +884,24 @@ cfdPaperRouter.post('/open-test-position', async (request, response) => {
   response.json({ ...result, status: await statusPayload() })
 })
 
-cfdPaperRouter.post('/close-position', (request, response) => {
+cfdPaperRouter.post('/close-position', async (request, response) => {
   const id = String(request.body?.id ?? '')
+  await updateOpenPositions()
   const position = getOpenPositions().find((item) => item.id === id)
   if (!position) {
     response.status(404).json({ ok: false, reason: 'Posicion no encontrada.' })
     return
   }
-  const closed = closePosition(id, position.currentPrice, 'USER_PAPER_CLOSE')
-  pushActivity({ action: 'CLOSE', symbol: position.cfdSymbol, reason: 'Cierre paper manual desde UI.', pnl: closed?.pnl })
-  response.json({ ok: true, closed })
+  const exitPrice = Number.isFinite(position.currentPrice) && position.currentPrice > 0 ? position.currentPrice : position.entryPrice
+  const closed = closePosition(id, exitPrice, 'USER_PAPER_CLOSE', position.openPnl, position.grossPnl)
+  if (closed) applyClosedPnl(closed.pnl)
+  pushActivity({ action: 'MANUAL_PAPER_CLOSE', symbol: position.cfdSymbol, reason: 'Cierre paper manual desde UI. No se envio orden real.', pnl: closed?.pnl })
+  response.json({
+    ok: true,
+    brokerExecutionEnabled: false,
+    closed,
+    paperOnly: true,
+    realTradingAllowed: false,
+    status: await statusPayload(),
+  })
 })

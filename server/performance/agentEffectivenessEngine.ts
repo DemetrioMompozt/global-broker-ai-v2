@@ -49,10 +49,12 @@ export function buildAgentEffectiveness(input: {
   const wins = closedToday.filter((trade) => trade.pnl > 0)
   const losses = closedToday.filter((trade) => trade.pnl < 0)
   const targetHits = closedToday.filter((trade) => closeBucket(trade) === 'target')
+  const partialProfitClosures = closedToday.filter((trade) => trade.pnl > 0 && closeBucket(trade) !== 'target')
   const rotations = closedToday.filter((trade) => closeBucket(trade) === 'rotation')
   const staleClosures = closedToday.filter((trade) => closeBucket(trade) === 'stale')
   const lossClosures = closedToday.filter((trade) => closeBucket(trade) === 'loss')
   const grossProfit = wins.reduce((sum, trade) => sum + trade.pnl, 0)
+  const partialProfitPnl = partialProfitClosures.reduce((sum, trade) => sum + trade.pnl, 0)
   const grossLoss = Math.abs(losses.reduce((sum, trade) => sum + trade.pnl, 0))
   const netProfitToday = closedToday.reduce((sum, trade) => sum + trade.pnl, 0)
   const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? null : 0
@@ -123,6 +125,8 @@ export function buildAgentEffectiveness(input: {
     openPnl: Number(input.account.openPnl.toFixed(4)),
     openPositions: input.openPositions.length,
     opportunitiesBlocked: input.blockedOpportunities.length,
+    partialProfitClosuresToday: partialProfitClosures.length,
+    partialProfitPnlToday: Number(partialProfitPnl.toFixed(4)),
     principalBlockingReason,
     principalClosureReason,
     profitFactor: profitFactor === null ? null : Number(profitFactor.toFixed(4)),
