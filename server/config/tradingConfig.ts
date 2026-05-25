@@ -4,7 +4,7 @@ export const tradingConfig = {
   maxOpenPositions: 10,
   maxOpenPositionsPerAsset: 1,
   maxTotalSimulatedRiskPercent: 4.5,
-  maxCryptoPositions: 1,
+  maxCryptoPositions: 4,
   riskPerCryptoTradePercent: 0.4,
   riskPerTradePercent: 0.45,
   minCfdExpertScore: 80,
