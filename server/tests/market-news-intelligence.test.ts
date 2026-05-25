@@ -67,13 +67,16 @@ const highImpactNews: Parameters<typeof validateMarketNewsForOpportunity>[0]['in
   }],
 }
 
-const blocked = validateMarketNewsForOpportunity({ intelligence: highImpactNews, opportunity })
-assert(!blocked.approved, 'High-impact macro news must require extra confirmation before main paper.')
+const context = validateMarketNewsForOpportunity({ intelligence: highImpactNews, opportunity })
+assert(context.approved, 'High-impact macro news must not block by itself.')
+assert(context.decisionImpact === 'NEWS_CONTEXT_CAUTION', 'High-impact macro news should become decision context.')
+assert(context.reason.includes('No bloquea'), context.reason)
 
 const elite = validateMarketNewsForOpportunity({
   intelligence: highImpactNews,
   opportunity: { ...opportunity, candleBehavior: { score: 88, signal: 'CONFIRMS_ENTRY' }, cfdExpertScore: 97, opportunityScore: 99 },
 })
 assert(elite.approved, elite.reason)
+assert(elite.decisionImpact === 'NEWS_CONFIRMS_STRONG_SETUP', 'Elite setup should keep news as supportive context.')
 
 done('market-news-intelligence')

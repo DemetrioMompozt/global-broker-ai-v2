@@ -191,9 +191,9 @@ async function refreshMarketNewsIntelligence() {
     sources: sourceStatuses,
     status: sourceStatuses.some((source) => source.status === 'OK') ? 'READY' : 'ERROR',
     summary: high.length
-      ? `${high.length} noticia(s) de alto impacto detectadas; el agente debe exigir confirmacion extra o esperar.`
+      ? `${high.length} noticia(s) de alto impacto detectadas; el agente las incorpora como contexto, no como bloqueo automatico.`
       : medium.length
-        ? `${medium.length} noticia(s) relevantes detectadas; operar solo con setup confirmado.`
+        ? `${medium.length} noticia(s) relevantes detectadas; el agente ajusta lectura y explicacion sin bloquear por noticia.`
         : 'Sin titulares recientes de alto impacto para el universo operado.',
     topEvents,
   }
@@ -234,27 +234,34 @@ export function validateMarketNewsForOpportunity(input: {
     : input.opportunity.candleBehaviorScore ?? 0
 
   if (input.intelligence.status === 'ERROR') {
-    return { approved: true, reason: 'News intelligence no disponible; no bloquea, pero el audit lo marca como stale.', relevantEvents: [] as MarketNewsEvent[] }
+    return { approved: true, decisionImpact: 'NO_NEWS_CONTEXT' as const, reason: 'News intelligence no disponible; no bloquea entradas.', relevantEvents: [] as MarketNewsEvent[], riskLevel: 'UNKNOWN' as const }
   }
-  if (highImpact.length && (score < 97 || cfdScore < 95 || candleScore < 82)) {
+  if (highImpact.length) {
+    const decisionImpact = score >= 97 && cfdScore >= 95 && candleScore >= 82 ? 'NEWS_CONFIRMS_STRONG_SETUP' : 'NEWS_CONTEXT_CAUTION'
     return {
-      approved: false,
-      reason: `News intelligence bloquea entrada: noticia de alto impacto (${highImpact[0].title}) afecta ${input.opportunity.cfdSymbol}; exige score 97, CFD 95 y vela 82.`,
+      approved: true,
+      decisionImpact,
+      reason: `News intelligence contextualiza ${input.opportunity.cfdSymbol}: noticia de alto impacto (${highImpact[0].title}). No bloquea; el agente debe explicar el riesgo macro en la decision.`,
       relevantEvents: highImpact.slice(0, 3),
+      riskLevel: 'HIGH' as const,
     }
   }
-  if (mediumImpact.length && (score < 92 || cfdScore < 90 || candleScore < 76)) {
+  if (mediumImpact.length) {
     return {
-      approved: false,
-      reason: `News intelligence exige confirmacion extra por noticia relevante (${mediumImpact[0].title}).`,
+      approved: true,
+      decisionImpact: 'NEWS_CONTEXT_CAUTION' as const,
+      reason: `News intelligence contextualiza ${input.opportunity.cfdSymbol}: noticia relevante (${mediumImpact[0].title}). No bloquea; se usa para lectura de riesgo.`,
       relevantEvents: mediumImpact.slice(0, 3),
+      riskLevel: 'MEDIUM' as const,
     }
   }
   return {
     approved: true,
+    decisionImpact: relevant.length ? 'NEWS_CONTEXT_LOW' as const : 'NO_NEWS_CONTEXT' as const,
     reason: relevant.length
-      ? `News intelligence aprueba con cautela: ${relevant.length} noticia(s) relevantes, pero el setup supera umbrales extra.`
+      ? `News intelligence agrega contexto: ${relevant.length} noticia(s) de baja/media relevancia para este simbolo.`
       : 'News intelligence sin riesgo relevante para este simbolo.',
     relevantEvents: relevant.slice(0, 3),
+    riskLevel: relevant.length ? 'LOW' as const : 'NONE' as const,
   }
 }

@@ -531,14 +531,12 @@ async function evaluateAgentCycle() {
         continue
       }
       const newsGate = validateMarketNewsForOpportunity({ intelligence: marketNews, opportunity })
-      if (!newsGate.approved) {
-        recoveryBlocked.push({ cfdSymbol: opportunity.cfdSymbol, reason: newsGate.reason })
+      if (newsGate.relevantEvents.length) {
         pushActivity({
-          action: 'NEWS_RISK_BLOCK',
+          action: 'NEWS_CONTEXT_APPLIED',
           symbol: opportunity.cfdSymbol,
-          reason: `${newsGate.reason} El agente espera confirmacion adicional antes de tocar balance paper.`,
+          reason: newsGate.reason,
         })
-        continue
       }
       const evidenceGate = watchdogPressure
         ? {
