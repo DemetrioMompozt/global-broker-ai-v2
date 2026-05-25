@@ -121,7 +121,7 @@ export function buildLossAttribution() {
   const recommendations = [
     'Mantener DEFENSIVE_DIAGNOSTIC_MODE activo: no abrir nuevas posiciones.',
     'Suspender simbolos con PF < 1 o tres perdidas consecutivas durante la sesion.',
-    'Reactivar con risk $10 solo en modo prueba controlada: max 2 posiciones, leverage maximo 10x y gate anti-perdida por simbolo.',
+    'Reactivar con risk $10 solo en modo prueba controlada: max 4 posiciones, leverage maximo 10x y gate anti-perdida por simbolo.',
   ]
   if (mainLossDriver === 'target_too_small') recommendations.push('Revisar target $2: costos/spread estan consumiendo demasiado del objetivo.')
   if (mainLossDriver === 'leverage') recommendations.push('Reducir leverage paper: 25x amplifica ruido y drawdown.')

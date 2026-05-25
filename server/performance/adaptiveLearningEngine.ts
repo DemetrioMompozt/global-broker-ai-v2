@@ -273,7 +273,7 @@ export function buildAdaptiveLearning() {
     rules,
     solutions,
     nextExperiment: rules.length
-      ? 'Probar solo oportunidades limpias no suspendidas; max 2 posiciones, risk $10, leverage <=10x.'
+      ? 'Probar solo oportunidades limpias no suspendidas; max 4 posiciones, risk $10, leverage <=10x.'
       : 'Recolectar muestra con entradas confirmadas y registrar resultado por simbolo.',
   }
 }

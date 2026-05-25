@@ -17,8 +17,8 @@ assert.strictEqual(diagnostic.mode, 'RECOVERY_PROBE_MODE', 'Por defecto debe que
 assert.strictEqual(diagnostic.newEntriesBlocked, false, 'Recovery probe permite entradas limitadas.')
 assert.strictEqual(diagnostic.newRiskUsd, 10, 'Recovery probe mantiene riesgo por posicion en $10.')
 assert.strictEqual(diagnostic.reactivationRiskUsd, 10, 'No debe bajar el riesgo a $2.')
-assert.strictEqual(diagnostic.maxReactivationLeverage, 10, 'Recovery probe usa leverage maximo 10x, no 25x.')
-assert.strictEqual(diagnostic.maxReactivationOpenPositions, 2, 'Recovery probe limita posiciones para medir edge.')
+assert.strictEqual(diagnostic.maxReactivationLeverage, 25, 'Recovery probe usa leverage paper 25x para eficiencia de margen sin subir riskUsd.')
+assert.strictEqual(diagnostic.maxReactivationOpenPositions, 6, 'Recovery probe permite varias posiciones controladas para medir edge.')
 
 activateDefensiveDiagnosticMode()
 diagnostic = getDefensiveDiagnosticMode({

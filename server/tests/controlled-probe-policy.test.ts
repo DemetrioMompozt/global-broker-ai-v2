@@ -157,4 +157,34 @@ const vtFlat = buildControlledProbeOpportunity({
 })
 assert(!vtFlat.approved && vtFlat.reason.includes('VT exige movimiento direccional parcial'), 'VT plano no debe abrir solo para llenar operaciones.')
 
+const vtRecoveryScout = buildControlledProbeOpportunity({
+  account,
+  openPositions: [],
+  opportunity: {
+    ...cryptoOpportunity,
+    assetClass: 'FOREX_CFD',
+    candleBehavior: {
+      available: true,
+      candlesUsed: 4,
+      pattern: 'TREND_CONTINUATION',
+      score: 89,
+      signal: 'CONFIRMS_ENTRY',
+    },
+    candleBehaviorScore: 89,
+    candlePattern: 'TREND_CONTINUATION',
+    cfdExpertScore: 76,
+    cfdSymbol: 'USDJPY.cfd',
+    expectedNetProfit: 3.8,
+    opportunityScore: 84,
+    quote: { ...cryptoQuote, cfdSymbol: 'USDJPY.cfd', feedType: 'BROKER_DEMO_REALTIME', pricingQuality: 'LIVE_BID_ASK', provider: 'VT Markets MT5 Demo', underlyingSymbol: 'USDJPY' },
+    setupStatus: 'NO_DIRECTIONAL_EDGE',
+    source: 'VT_MARKETS_MT5_DEMO',
+    underlyingSymbol: 'USDJPY',
+  },
+  relaxed: true,
+})
+assert(vtRecoveryScout.approved, vtRecoveryScout.reason)
+assert(vtRecoveryScout.opportunity.setupStatus === 'LEARNING_ESCAPE_PROBE', 'Recovery scout relajado debe poder medir un VT plano con vela fuerte y feed vivo.')
+assert((vtRecoveryScout.opportunity.cfdExpertScore ?? 0) >= 84, 'Recovery scout VT debe subir CFD score operativo para pasar evidence scout.')
+
 done('controlled-probe-policy')

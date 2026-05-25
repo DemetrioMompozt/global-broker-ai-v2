@@ -90,10 +90,13 @@ export function buildControlledProbeOpportunity(input: {
   const vtRelaxedEligible = relaxed
     && opportunity.source === 'VT_MARKETS_MT5_DEMO'
     && opportunity.quote.feedType === 'BROKER_DEMO_REALTIME'
-    && opportunity.setupStatus !== 'NO_DIRECTIONAL_EDGE'
     && (opportunity.opportunityScore ?? 0) >= 76
     && (opportunity.cfdExpertScore ?? 0) >= 72
     && c.signal !== 'BLOCKS_ENTRY'
+    && (
+      opportunity.setupStatus !== 'NO_DIRECTIONAL_EDGE'
+      || ((c.score ?? opportunity.candleBehaviorScore ?? 0) >= 78 && (opportunity.expectedNetProfit ?? 0) >= target * 1.3)
+    )
   const cryptoEligible = isCryptoProbeEligible(opportunity, c) || cryptoRelaxedEligible
   const vtEligible = isVtProbeEligible(opportunity, c) || vtRelaxedEligible
   if (!cryptoEligible && !vtEligible) {
@@ -112,7 +115,7 @@ export function buildControlledProbeOpportunity(input: {
     approved: true,
     opportunity: {
       ...opportunity,
-      cfdExpertScore: Math.max(opportunity.cfdExpertScore ?? 0, crypto ? 85 : 82),
+      cfdExpertScore: Math.max(opportunity.cfdExpertScore ?? 0, crypto ? 85 : 84),
       decision: 'APPROVED',
       opportunityScore: Math.max(opportunity.opportunityScore ?? 0, crypto ? 86 : 88),
       reason: `${relaxed ? 'LEARNING_ESCAPE_PROBE' : 'CONTROLLED_PROBE'}: entrada paper intermedia con feed vivo y vela no bloqueante. ${opportunity.reason}`,

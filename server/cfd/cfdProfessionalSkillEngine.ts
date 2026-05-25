@@ -46,8 +46,8 @@ export function evaluateCfdProfessionalSkill(input: {
     METAL_CFD: 0.35,
   }[input.assetClass] ?? 0.35
   const positionMarginShare = input.account.equity > 0 ? input.marginRequired / input.account.equity : Infinity
-  const marginHealthy = projectedFreeMargin > input.account.equity * 0.2
-    && projectedMarginLevel >= 150
+  const marginHealthy = projectedFreeMargin > input.account.equity * 0.15
+    && projectedMarginLevel >= 140
     && positionMarginShare <= maxMarginShare
   const liveBidAsk = input.quote.pricingQuality === 'LIVE_BID_ASK' && input.quote.bid > 0 && input.quote.ask > input.quote.bid
   const dynamicEstimatedSpread = input.quote.pricingQuality === 'LIVE_MID_ESTIMATED_SPREAD'

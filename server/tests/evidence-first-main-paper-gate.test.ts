@@ -185,4 +185,53 @@ const scoutDespiteWeakStrategy = validateEvidenceFirstMainPaperGate({
 })
 assert(scoutDespiteWeakStrategy.approved, scoutDespiteWeakStrategy.reason)
 
+const vtRecoveryScout = validateEvidenceFirstMainPaperGate({
+  allowLearningScout: true,
+  attribution: {
+    ...attribution,
+    worstStrategies: [{ name: 'SessionMomentum', netPnl: -12.67, trades: 18 }],
+  },
+  effectiveness: ineffective,
+  opportunity: {
+    ...baseOpportunity,
+    candleBehavior: { score: 100, signal: 'CONFIRMS_ENTRY' },
+    cfdExpertScore: 93,
+    cfdSymbol: 'USDJPY.cfd',
+    edgeEfficiency: 0.52,
+    edgeMoveBps: 0.41,
+    edgePersistence: 0.64,
+    edgeRequiredMoveBps: 0.35,
+    expectedNetProfit: 3.89,
+    opportunityScore: 95,
+    quote: { ...quote, cfdSymbol: 'USDJPY.cfd', underlyingSymbol: 'USDJPY' },
+    setupStatus: 'CONFIRMED',
+    source: 'VT_MARKETS_MT5_DEMO',
+    underlyingSymbol: 'USDJPY',
+  },
+})
+assert(vtRecoveryScout.approved && vtRecoveryScout.reason.includes('recovery scout'), vtRecoveryScout.reason)
+
+const vtPracticalRecoveryScout = validateEvidenceFirstMainPaperGate({
+  allowLearningScout: true,
+  attribution,
+  effectiveness: ineffective,
+  opportunity: {
+    ...baseOpportunity,
+    candleBehavior: { score: 43, signal: 'CONFIRMS_ENTRY' },
+    cfdExpertScore: 86,
+    cfdSymbol: 'USDJPY.cfd',
+    edgeEfficiency: 0.55,
+    edgeMoveBps: -0.53,
+    edgePersistence: 0.5,
+    edgeRequiredMoveBps: 0.35,
+    expectedNetProfit: 3.77,
+    opportunityScore: 88.4,
+    quote: { ...quote, cfdSymbol: 'USDJPY.cfd', underlyingSymbol: 'USDJPY' },
+    setupStatus: 'CONFIRMED',
+    source: 'VT_MARKETS_MT5_DEMO',
+    underlyingSymbol: 'USDJPY',
+  },
+})
+assert(vtPracticalRecoveryScout.approved, vtPracticalRecoveryScout.reason)
+
 done('evidence-first-main-paper-gate')

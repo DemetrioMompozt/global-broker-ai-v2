@@ -23,6 +23,7 @@ import { getPerformanceSummary } from '../performance/performanceEngine.js'
 import { buildTargetFeasibility } from '../performance/targetFeasibilityAnalyzer.js'
 import { buildProfessionalSystemAudit } from '../ops/professionalSystemAudit.js'
 import { buildNoPositionWatchdog } from '../ops/noPositionWatchdog.js'
+import { buildProfitCadenceWatchdog } from '../ops/profitCadenceWatchdog.js'
 import { getKillSwitchStatus } from '../risk/killSwitch.js'
 import { getPerformanceGuardStatus } from '../risk/performanceGuard.js'
 import { isRecoveryMode, validateRecoveryCandidate } from '../risk/effectivenessRecoveryGuard.js'
@@ -58,6 +59,7 @@ let lastResearchLearningRunAt: string | null = null
 let lastAuditGrade: string | null = null
 let lastPositionOpenedAt: string | null = null
 let lastNoPositionWatchdogActivityAt = 0
+let lastProfitCadenceWatchdogActivityAt = 0
 const activityFeed: Activity[] = []
 let loop: NodeJS.Timeout | undefined
 let lastStatusPositionUpdateAt = 0
@@ -380,12 +382,25 @@ async function evaluateAgentCycle() {
     openPositions: getOpenPositions(),
     opportunities: scan.opportunities,
   })
+  const profitCadenceWatchdog = buildProfitCadenceWatchdog({
+    account,
+    openPositions: getOpenPositions(),
+    opportunities: scan.opportunities,
+  })
   if (noPositionWatchdog.active && Date.now() - lastNoPositionWatchdogActivityAt > 30_000) {
     lastNoPositionWatchdogActivityAt = Date.now()
     pushActivity({
       action: 'NO_POSITION_WATCHDOG_TRIGGERED',
       symbol: noPositionWatchdog.candidateSymbol ?? undefined,
       reason: noPositionWatchdog.reason,
+    })
+  }
+  if (profitCadenceWatchdog.active && Date.now() - lastProfitCadenceWatchdogActivityAt > 30_000) {
+    lastProfitCadenceWatchdogActivityAt = Date.now()
+    pushActivity({
+      action: 'PROFIT_CADENCE_ESCALATION',
+      symbol: profitCadenceWatchdog.candidateSymbol ?? undefined,
+      reason: profitCadenceWatchdog.reason,
     })
   }
   const rotation = reviewOpenPositions({ account, accountHealth: health.accountHealth, opportunities: scan.opportunities, positions: getOpenPositions() })
@@ -492,8 +507,14 @@ async function evaluateAgentCycle() {
     for (const rawOpportunity of scan.opportunities) {
       if (openSymbols.has(rawOpportunity.cfdSymbol)) continue
       const watchdogPressure = noPositionWatchdog.active
+      const cadencePressure = profitCadenceWatchdog.active
+      const recoveryScoutPressure = defensiveDiagnostic.mode === 'RECOVERY_PROBE_MODE'
+        && !defensiveDiagnostic.active
+        && health.accountHealth === 'HEALTHY'
+        && getOpenPositions().length < defensiveDiagnostic.maxReactivationOpenPositions
+      const controlledScoutPressure = watchdogPressure || recoveryScoutPressure || cadencePressure
       const probe = defensiveDiagnostic.mode === 'RECOVERY_PROBE_MODE' || watchdogPressure
-        ? buildControlledProbeOpportunity({ account, openPositions: getOpenPositions(), opportunity: rawOpportunity, relaxed: watchdogPressure })
+        ? buildControlledProbeOpportunity({ account, openPositions: getOpenPositions(), opportunity: rawOpportunity, relaxed: controlledScoutPressure })
         : { approved: rawOpportunity.setupConfirmed && rawOpportunity.opportunityScore >= 85, opportunity: rawOpportunity, reason: 'Setup confirmado.' }
       if (!probe.approved) {
         recoveryBlocked.push({ cfdSymbol: rawOpportunity.cfdSymbol, reason: probe.reason })
@@ -504,11 +525,11 @@ async function evaluateAgentCycle() {
         recoveryBlocked.push({ cfdSymbol: opportunity.cfdSymbol, reason: `Setup/score insuficiente: ${opportunity.setupStatus}, score ${opportunity.opportunityScore.toFixed(0)}.` })
         continue
       }
-      const probeMinScore = watchdogPressure
+      const probeMinScore = controlledScoutPressure
         ? opportunity.source === 'BINANCE_REALTIME' || opportunity.assetClass === 'CRYPTO_CFD' ? 80 : 82
         : opportunity.source === 'BINANCE_REALTIME' || opportunity.assetClass === 'CRYPTO_CFD' ? 86 : 90
-      const probeMinCfdScore = watchdogPressure
-        ? opportunity.source === 'BINANCE_REALTIME' || opportunity.assetClass === 'CRYPTO_CFD' ? 78 : 76
+      const probeMinCfdScore = controlledScoutPressure
+        ? opportunity.source === 'BINANCE_REALTIME' || opportunity.assetClass === 'CRYPTO_CFD' ? 85 : 76
         : opportunity.setupStatus === 'CONTROLLED_PROBE'
         ? opportunity.assetClass === 'CRYPTO_CFD' ? 85 : 82
         : opportunity.source === 'BINANCE_REALTIME' || opportunity.assetClass === 'CRYPTO_CFD' ? 87 : 88
@@ -516,11 +537,16 @@ async function evaluateAgentCycle() {
         recoveryBlocked.push({ cfdSymbol: opportunity.cfdSymbol, reason: `Recovery probe exige score >= ${probeMinScore} y CFD score >= ${probeMinCfdScore}. Score ${opportunity.opportunityScore.toFixed(0)}, CFD ${(opportunity.cfdExpertScore ?? 0).toFixed(0)}.` })
         continue
       }
-      const patternFirewall = validateLossPatternFirewall({
-        attribution: cycleLossAttribution,
-        effectiveness,
-        opportunity,
-      })
+      const patternFirewall = controlledScoutPressure
+        ? {
+          approved: true,
+          reason: 'Recovery scout paper: el firewall de perdidas no bloquea la medicion controlada; RiskGuard, DataGuard, PortfolioRiskGuard y KillSwitch siguen activos.',
+        }
+        : validateLossPatternFirewall({
+          attribution: cycleLossAttribution,
+          effectiveness,
+          opportunity,
+        })
       if (!patternFirewall.approved) {
         recoveryBlocked.push({ cfdSymbol: opportunity.cfdSymbol, reason: patternFirewall.reason })
         pushActivity({
@@ -538,7 +564,7 @@ async function evaluateAgentCycle() {
           reason: newsGate.reason,
         })
       }
-      const evidenceGate = watchdogPressure
+      const evidenceGate = controlledScoutPressure
         ? validateEvidenceFirstMainPaperGate({
           allowLearningScout: true,
           attribution: cycleLossAttribution,
@@ -559,15 +585,15 @@ async function evaluateAgentCycle() {
         })
         continue
       }
-      const traderGate = watchdogPressure
-        ? { approved: true, reason: 'No-position watchdog aprueba presión controlada: el sistema sano no debe quedarse quieto.', repairMode: false }
+      const traderGate = controlledScoutPressure
+        ? { approved: true, reason: 'Recovery scout aprueba presion controlada: la cuenta esta sana y no debe quedarse con una sola posicion.', repairMode: false }
         : validateTraderEntryGate({ account, effectiveness, openPositions: getOpenPositions(), opportunity })
       if (!traderGate.approved) {
         recoveryBlocked.push({ cfdSymbol: opportunity.cfdSymbol, reason: traderGate.reason })
         continue
       }
-      const recovery = watchdogPressure
-        ? { approved: true, reason: 'Watchdog profesional relaja recovery guard para una entrada paper controlada.' }
+      const recovery = controlledScoutPressure
+        ? { approved: true, reason: 'Recovery scout profesional relaja recovery guard para una entrada paper controlada.' }
         : validateRecoveryCandidate({ effectiveness, opportunity })
       if (!recovery.approved) {
         recoveryBlocked.push({ cfdSymbol: opportunity.cfdSymbol, reason: recovery.reason })
@@ -576,6 +602,8 @@ async function evaluateAgentCycle() {
       if (opportunity.setupStatus === 'CONTROLLED_PROBE') pushActivity({ action: 'CONTROLLED_PROBE_APPROVED', symbol: opportunity.cfdSymbol, reason: probe.reason })
       if (opportunity.setupStatus === 'LEARNING_ESCAPE_PROBE') pushActivity({ action: 'LEARNING_ESCAPE_PROBE_APPROVED', symbol: opportunity.cfdSymbol, reason: probe.reason })
       if (watchdogPressure) pushActivity({ action: 'NO_POSITION_WATCHDOG_APPROVED', symbol: opportunity.cfdSymbol, reason: noPositionWatchdog.reason })
+      if (cadencePressure) pushActivity({ action: 'PROFIT_CADENCE_SCOUT_APPROVED', symbol: opportunity.cfdSymbol, reason: profitCadenceWatchdog.reason })
+      if (recoveryScoutPressure && !watchdogPressure) pushActivity({ action: 'RECOVERY_SCOUT_APPROVED', symbol: opportunity.cfdSymbol, reason: 'Recovery scout permite otra posicion paper si el setup es fuerte y la cuenta esta sana.' })
       if (recoveryMode) pushActivity({ action: 'RECOVERY_SNIPER_APPROVED', symbol: opportunity.cfdSymbol, reason: recovery.reason })
       candidates.push(opportunity)
     }
@@ -597,6 +625,18 @@ async function evaluateAgentCycle() {
         : `Agente corriendo y escaneando; todavia no hay setup CONFIRMED. Mejor lectura: ${best.cfdSymbol} ${best.setupStatus}, score ${best.opportunityScore.toFixed(0)}, CFD ${(best.cfdExpertScore ?? 0).toFixed(0)}.`
       lastDecision = { decision: 'WAIT_FOR_CONFIRMED_SETUP', reason, symbol: best.cfdSymbol }
       pushActivity({ action: 'WAIT_FOR_CONFIRMED_SETUP', symbol: best.cfdSymbol, reason })
+    }
+    if (noPositionWatchdog.active || profitCadenceWatchdog.active || defensiveDiagnostic.mode === 'RECOVERY_PROBE_MODE') {
+      const pressureCandidate = profitCadenceWatchdog.candidateSymbol ?? noPositionWatchdog.candidateSymbol
+      candidates.sort((a, b) => {
+        if (pressureCandidate && a.cfdSymbol === pressureCandidate) return -1
+        if (pressureCandidate && b.cfdSymbol === pressureCandidate) return 1
+        const sourcePriority = (a.source === 'VT_MARKETS_MT5_DEMO' ? 0 : 1) - (b.source === 'VT_MARKETS_MT5_DEMO' ? 0 : 1)
+        if (sourcePriority !== 0) return sourcePriority
+        const confirmedPriority = Number(Boolean(b.setupConfirmed)) - Number(Boolean(a.setupConfirmed))
+        if (confirmedPriority !== 0) return confirmedPriority
+        return ((b.learningAdjustedScore ?? b.opportunityScore) - (a.learningAdjustedScore ?? a.opportunityScore))
+      })
     }
     for (const opportunity of candidates) {
       account = accountSnapshot()
@@ -720,6 +760,11 @@ async function statusPayload() {
     openPositions,
     opportunities: lastOpportunities,
   })
+  const profitCadenceWatchdog = buildProfitCadenceWatchdog({
+    account,
+    openPositions,
+    opportunities: lastOpportunities,
+  })
   const mainPaperEvidenceGate = lastOpportunities[0]
     ? validateEvidenceFirstMainPaperGate({
       attribution: lossAttribution,
@@ -817,6 +862,7 @@ async function statusPayload() {
     cfdTraderSkill,
     professionalAudit,
     noPositionWatchdog,
+    profitCadenceWatchdog,
     traderDecision,
     vtMarkets: {
       ...vtStatus,
@@ -862,7 +908,7 @@ cfdPaperRouter.post('/activate-defensive-diagnostic', (_request, response) => {
 })
 
 cfdPaperRouter.post('/activate-recovery-probe', (_request, response) => {
-  activateRecoveryProbeMode('Punto medio activo: max 2 posiciones, risk $10, leverage maximo 10x y entradas solo con setup fuerte.')
+  activateRecoveryProbeMode('Punto medio activo: max 6 posiciones, risk $10, leverage paper maximo 25x en CFDs no cripto y entradas con scout controlado.')
   diagnosticModeAnnounced = false
   lastDecision = { decision: 'RECOVERY_PROBE_MODE', mode: 'RECOVERY_PROBE_MODE', reason: 'Entradas paper limitadas para medir edge sin modo agresivo.' }
   pushActivity({ action: 'RECOVERY_PROBE_ON', reason: 'Modo intermedio activado: risk $10, entradas limitadas, gating mas inteligente y sin dinero real.' })

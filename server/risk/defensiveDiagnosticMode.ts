@@ -98,8 +98,8 @@ export function getDefensiveDiagnosticMode(account: AccountSnapshot): DefensiveD
   if (!active && recoveryProbeActive) {
     return {
       active: false,
-      maxReactivationLeverage: 10,
-      maxReactivationOpenPositions: 2,
+      maxReactivationLeverage: 25,
+      maxReactivationOpenPositions: 6,
       microProfitSuspended: false,
       mode: 'RECOVERY_PROBE_MODE',
       newEntriesBlocked: false,

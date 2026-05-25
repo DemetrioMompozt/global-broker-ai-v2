@@ -109,6 +109,17 @@ export function validateEvidenceFirstMainPaperGate(input: {
     && candle >= (isCrypto && opportunity.setupStatus === 'LEARNING_ESCAPE_PROBE' ? 50 : isCrypto ? 70 : 68)
     && expected >= target * (isCrypto ? 0.75 : 1)
     && (opportunity.riskReward ?? 0) >= 2)
+  const recoveryScout = Boolean(input.allowLearningScout
+    && liveFeed(opportunity)
+    && confirmed(opportunity)
+    && signal !== 'BLOCKS_ENTRY'
+    && score >= (isCrypto ? 90 : 88)
+    && cfdScore >= (isCrypto ? 86 : 86)
+    && candle >= (isCrypto ? 70 : 40)
+    && expected >= target * (isCrypto ? 1 : 1.5)
+    && (opportunity.riskReward ?? 0) >= 2
+    && (isCrypto || multiple >= 1))
+  const scoutApproved = learningScout || recoveryScout
   const ultraEliteUnproven = liveFeed(opportunity)
     && confirmed(opportunity)
     && signal !== 'BLOCKS_ENTRY'
@@ -138,20 +149,20 @@ export function validateEvidenceFirstMainPaperGate(input: {
   if (strategyMemory && strategyMemory.netPnl < -3) {
     reasons.push(`estrategia con perdida reciente $${Math.abs(strategyMemory.netPnl).toFixed(2)}`)
   }
-  if (badShadow && !learningScout) {
+  if (badShadow && !scoutApproved) {
     reasons.push(`shadow learning aun no valida ${opportunity.cfdSymbol}: ${shadowEvidence.samples} muestras, net $${shadowEvidence.netPnl}, hit rate ${shadowEvidence.targetHitRate}%`)
   }
-  if (!positiveShadow && !ultraEliteUnproven && !learningScout) {
+  if (!positiveShadow && !ultraEliteUnproven && !scoutApproved) {
     reasons.push(`sin evidencia positiva: ${shadowEvidence.samples} muestras shadow, ${shadowEvidence.targetHits} targets, expected $${shadowEvidence.expectedPayoff}`)
   }
-  if (!evidenceBackedSetup && !ultraEliteUnproven && !learningScout) {
+  if (!evidenceBackedSetup && !ultraEliteUnproven && !scoutApproved) {
     reasons.push(`calidad insuficiente para recovery: score ${score.toFixed(0)}, CFD ${cfdScore.toFixed(0)}, vela ${candle.toFixed(0)}, expected $${expected.toFixed(2)}, move ${multiple.toFixed(2)}x`)
   }
 
-  const approved = (evidenceBackedSetup || ultraEliteUnproven || learningScout)
-    && (!badShadow || learningScout)
-    && !(symbolMemory && symbolMemory.status === 'BAN_FOR_SESSION')
-    && !(strategyMemory && strategyMemory.netPnl < -6 && !ultraEliteUnproven && !learningScout)
+  const approved = (evidenceBackedSetup || ultraEliteUnproven || scoutApproved)
+    && (!badShadow || scoutApproved)
+    && !(symbolMemory && symbolMemory.status === 'BAN_FOR_SESSION' && (!scoutApproved || !isCrypto))
+    && !(strategyMemory && strategyMemory.netPnl < -6 && !ultraEliteUnproven && !scoutApproved)
 
   return {
     active,
@@ -160,6 +171,8 @@ export function validateEvidenceFirstMainPaperGate(input: {
     reason: approved
       ? positiveShadow
         ? `Evidence gate aprueba main paper: shadow positivo en ${opportunity.cfdSymbol} (${shadowEvidence.samples} muestras, ${shadowEvidence.targetHits} targets, expected $${shadowEvidence.expectedPayoff}) y setup actual fuerte.`
+        : recoveryScout
+          ? `Evidence gate aprueba recovery scout en ${opportunity.cfdSymbol}: setup confirmado, feed vivo, vela fuerte y margen para medir edge en main paper controlado.`
         : learningScout
           ? `Evidence gate aprueba learning scout en ${opportunity.cfdSymbol}: feed vivo, vela no bloqueante y watchdog evita quedarse paralizado; se mide en main paper controlado.`
           : `Evidence gate aprueba solo por ultra-elite: setup excepcional pese a falta de evidencia shadow positiva.`
