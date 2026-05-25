@@ -52,12 +52,12 @@ export default function App() {
       </div>
 
       <OpenCfdPositions maxPositions={status.limits?.maxTotalOpenPositions ?? 10} onClosed={refresh} positions={status.openPositions} />
+      <AgentEffectivenessMonitor effectiveness={status.agentEffectiveness} firewall={status.lossPatternFirewall} learningCampaign={status.learningCampaign} />
+      <MicroProfitPanel microProfit={status.microProfit} />
       <TraderDecisionEngine decision={status.traderDecision} />
       <OpportunityWatchlist opportunities={status.opportunities} blocked={status.blockedOpportunities} />
       <ActivityFeed items={status.activityFeed} />
 
-      <AgentEffectivenessMonitor effectiveness={status.agentEffectiveness} firewall={status.lossPatternFirewall} learningCampaign={status.learningCampaign} />
-      <MicroProfitPanel microProfit={status.microProfit} />
       <CFDTraderSkillPanel skill={status.cfdTraderSkill} />
       <CFDExpertPanel evaluation={status.cfdExpert.lastEvaluation} />
       <RealtimeReadiness feeds={status.feeds} />
