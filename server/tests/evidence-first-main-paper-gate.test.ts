@@ -142,4 +142,47 @@ const banned = validateEvidenceFirstMainPaperGate({
 })
 assert(!banned.approved, 'A session-banned symbol must not reenter main paper even with an elite-looking tick.')
 
+const scout = validateEvidenceFirstMainPaperGate({
+  allowLearningScout: true,
+  attribution,
+  effectiveness: ineffective,
+  opportunity: {
+    ...baseOpportunity,
+    assetClass: 'CRYPTO_CFD',
+    candleBehavior: { score: 78, signal: 'CONFIRMS_ENTRY' },
+    cfdExpertScore: 85,
+    cfdSymbol: 'TESTSCOUT.cfd',
+    expectedNetProfit: 2,
+    opportunityScore: 86,
+    quote: { ...quote, cfdSymbol: 'TESTSCOUT.cfd', feedType: 'REALTIME_TICK', pricingQuality: 'LIVE_MID_ESTIMATED_SPREAD', provider: 'Binance', underlyingSymbol: 'TESTSCOUTUSDT' },
+    setupStatus: 'LEARNING_ESCAPE_PROBE',
+    source: 'BINANCE_REALTIME',
+    underlyingSymbol: 'TESTSCOUTUSDT',
+  },
+})
+assert(scout.approved && scout.reason.includes('learning scout'), scout.reason)
+
+const scoutDespiteWeakStrategy = validateEvidenceFirstMainPaperGate({
+  allowLearningScout: true,
+  attribution: {
+    ...attribution,
+    worstStrategies: [{ name: 'SessionMomentum', netPnl: -12.67, trades: 18 }],
+  },
+  effectiveness: ineffective,
+  opportunity: {
+    ...baseOpportunity,
+    assetClass: 'CRYPTO_CFD',
+    candleBehavior: { score: 78, signal: 'CONFIRMS_ENTRY' },
+    cfdExpertScore: 85,
+    cfdSymbol: 'TESTSCOUT2.cfd',
+    expectedNetProfit: 2,
+    opportunityScore: 86,
+    quote: { ...quote, cfdSymbol: 'TESTSCOUT2.cfd', feedType: 'REALTIME_TICK', pricingQuality: 'LIVE_MID_ESTIMATED_SPREAD', provider: 'Binance', underlyingSymbol: 'TESTSCOUT2USDT' },
+    setupStatus: 'LEARNING_ESCAPE_PROBE',
+    source: 'BINANCE_REALTIME',
+    underlyingSymbol: 'TESTSCOUT2USDT',
+  },
+})
+assert(scoutDespiteWeakStrategy.approved, scoutDespiteWeakStrategy.reason)
+
 done('evidence-first-main-paper-gate')

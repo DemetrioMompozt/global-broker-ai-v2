@@ -87,7 +87,6 @@ export function buildControlledProbeOpportunity(input: {
     && (opportunity.opportunityScore ?? 0) >= 78
     && (opportunity.cfdExpertScore ?? 0) >= 76
     && c.signal !== 'BLOCKS_ENTRY'
-    && (c.available !== false)
   const vtRelaxedEligible = relaxed
     && opportunity.source === 'VT_MARKETS_MT5_DEMO'
     && opportunity.quote.feedType === 'BROKER_DEMO_REALTIME'

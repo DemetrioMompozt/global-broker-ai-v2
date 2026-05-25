@@ -539,12 +539,12 @@ async function evaluateAgentCycle() {
         })
       }
       const evidenceGate = watchdogPressure
-        ? {
-          active: true,
-          approved: false,
-          reason: 'Evidence gate bloquea watchdog: despues de perdidas, el sistema no fuerza entradas main paper sin evidencia positiva.',
-          shadowLearningRecommended: true,
-        }
+        ? validateEvidenceFirstMainPaperGate({
+          allowLearningScout: true,
+          attribution: cycleLossAttribution,
+          effectiveness,
+          opportunity,
+        })
         : validateEvidenceFirstMainPaperGate({
           attribution: cycleLossAttribution,
           effectiveness,

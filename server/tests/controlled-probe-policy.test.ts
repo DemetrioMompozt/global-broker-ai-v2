@@ -111,6 +111,28 @@ const learningEscape = buildControlledProbeOpportunity({
 assert(learningEscape.approved, learningEscape.reason)
 assert(learningEscape.opportunity.setupStatus === 'LEARNING_ESCAPE_PROBE', 'Watchdog relajado debe convertir a LEARNING_ESCAPE_PROBE para evitar bloqueo permanente.')
 
+const waitingCandlesEscape = buildControlledProbeOpportunity({
+  account,
+  openPositions: [],
+  opportunity: {
+    ...cryptoOpportunity,
+    candleBehavior: {
+      available: false,
+      candlesUsed: 0,
+      pattern: 'INSUFFICIENT_CANDLES',
+      score: 50,
+      signal: 'NEUTRAL',
+    },
+    candleBehaviorScore: 50,
+    cfdExpertScore: 78,
+    expectedNetProfit: 2.6,
+    opportunityScore: 80,
+    setupStatus: 'WAITING_FOR_CANDLES',
+  },
+  relaxed: true,
+})
+assert(waitingCandlesEscape.approved, waitingCandlesEscape.reason)
+
 const candleBlocked = buildControlledProbeOpportunity({
   account,
   openPositions: [],
