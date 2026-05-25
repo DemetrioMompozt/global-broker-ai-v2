@@ -33,7 +33,11 @@ export default function App() {
     return (
       <AppShell>
         <Header />
-        <section className="panel"><h2>Cargando Global Broker AI v2...</h2><p className="muted">Primera pantalla rapida; los feeds vivos entran en background.</p>{error ? <p className="warning">{error}</p> : null}</section>
+        <section className="panel">
+          <h2>Cargando Global Broker AI v2...</h2>
+          <p className="muted">Primera pantalla rapida; los feeds vivos entran en background.</p>
+          {error ? <p className="warning">{error}</p> : null}
+        </section>
       </AppShell>
     )
   }
@@ -43,6 +47,22 @@ export default function App() {
       <Header />
       <AccountSummary account={status.account} />
       <HeroAgentStatus status={status} />
+      <div className="refresh-line">
+        UI refresh: {lastRefresh ? new Date(lastRefresh).toLocaleTimeString() : 'pendiente'} - Server: {new Date(status.serverTime).toLocaleTimeString()}
+      </div>
+
+      <OpenCfdPositions maxPositions={status.limits?.maxTotalOpenPositions ?? 10} onClosed={refresh} positions={status.openPositions} />
+      <TraderDecisionEngine decision={status.traderDecision} />
+      <OpportunityWatchlist opportunities={status.opportunities} blocked={status.blockedOpportunities} />
+      <ActivityFeed items={status.activityFeed} />
+
+      <AgentEffectivenessMonitor effectiveness={status.agentEffectiveness} firewall={status.lossPatternFirewall} learningCampaign={status.learningCampaign} />
+      <MicroProfitPanel microProfit={status.microProfit} />
+      <CFDTraderSkillPanel skill={status.cfdTraderSkill} />
+      <CFDExpertPanel evaluation={status.cfdExpert.lastEvaluation} />
+      <RealtimeReadiness feeds={status.feeds} />
+      <VTMarketsReadiness vt={status.vtMarkets} />
+
       <ProfessionalSystemAudit audit={status.professionalAudit} watchdog={status.noPositionWatchdog} />
       <DefensiveDiagnosticMode diagnostic={status.defensiveDiagnostic} />
       <AgentLearningPanel learning={status.adaptiveLearning} />
@@ -52,17 +72,6 @@ export default function App() {
       <LearningCampaignMonitor campaign={status.learningCampaign} />
       <LossPatternFirewallPanel firewall={status.lossPatternFirewall} />
       <LossAttributionPanel attribution={status.lossAttribution} leverage={status.leverageDamage} target={status.targetFeasibility} />
-      <CFDTraderSkillPanel skill={status.cfdTraderSkill} />
-      <TraderDecisionEngine decision={status.traderDecision} />
-      <AgentEffectivenessMonitor effectiveness={status.agentEffectiveness} firewall={status.lossPatternFirewall} learningCampaign={status.learningCampaign} />
-      <MicroProfitPanel microProfit={status.microProfit} />
-      <div className="refresh-line">UI refresh: {lastRefresh ? new Date(lastRefresh).toLocaleTimeString() : 'pendiente'} · Server: {new Date(status.serverTime).toLocaleTimeString()}</div>
-      <OpenCfdPositions maxPositions={status.limits?.maxTotalOpenPositions ?? 10} onClosed={refresh} positions={status.openPositions} />
-      <OpportunityWatchlist opportunities={status.opportunities} blocked={status.blockedOpportunities} />
-      <CFDExpertPanel evaluation={status.cfdExpert.lastEvaluation} />
-      <RealtimeReadiness feeds={status.feeds} />
-      <VTMarketsReadiness vt={status.vtMarkets} />
-      <ActivityFeed items={status.activityFeed} />
       <PerformanceIntelligence performance={status.performance} />
       <TradingCalendar />
     </AppShell>
