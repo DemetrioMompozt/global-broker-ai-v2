@@ -59,10 +59,25 @@ function netToday() {
 }
 
 function exceptionalReversal(opportunity: Opportunity) {
+  const target = getMicroProfitTargetNetUsd()
   const moveMultiple = opportunity.edgeRequiredMoveBps && opportunity.edgeRequiredMoveBps > 0
     ? Math.abs(opportunity.edgeMoveBps ?? 0) / opportunity.edgeRequiredMoveBps
     : 0
-  return (opportunity.opportunityScore ?? 0) >= 96
+  const candle = opportunity.candleBehavior
+  const candleScore = typeof candle === 'object' && candle && 'score' in candle && typeof candle.score === 'number'
+    ? candle.score
+    : opportunity.candleBehaviorScore ?? 0
+  const liveVtEliteSetup = opportunity.source === 'VT_MARKETS_MT5_DEMO'
+    && opportunity.setupConfirmed
+    && opportunity.setupStatus === 'CONFIRMED'
+    && opportunity.quote.feedType === 'BROKER_DEMO_REALTIME'
+    && candleSignal(opportunity) !== 'BLOCKS_ENTRY'
+    && candleScore >= 72
+    && (opportunity.opportunityScore ?? 0) >= 95
+    && (opportunity.cfdExpertScore ?? 0) >= 92
+    && (opportunity.expectedNetProfit ?? 0) >= target * 1.75
+    && (opportunity.riskReward ?? 0) >= 2
+  return liveVtEliteSetup || (opportunity.opportunityScore ?? 0) >= 96
     && (opportunity.cfdExpertScore ?? 0) >= 94
     && moveMultiple >= 2.5
     && (opportunity.edgePersistence ?? 0) >= 0.78

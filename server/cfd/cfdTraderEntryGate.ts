@@ -41,6 +41,18 @@ function directionLoss(input: ReturnType<typeof buildLossAttribution>, direction
   return input.worstDirections.find((item) => item.name === direction)
 }
 
+function candleScore(opportunity: Opportunity) {
+  const candle = opportunity.candleBehavior
+  if (typeof candle === 'object' && candle && 'score' in candle && typeof candle.score === 'number') return candle.score
+  return opportunity.candleBehaviorScore ?? 0
+}
+
+function candleSignal(opportunity: Opportunity) {
+  const candle = opportunity.candleBehavior
+  if (typeof candle === 'object' && candle && 'signal' in candle && typeof candle.signal === 'string') return candle.signal
+  return null
+}
+
 export function validateTraderEntryGate(input: {
   account: AccountSnapshot
   effectiveness: EffectivenessSnapshot
@@ -66,11 +78,22 @@ export function validateTraderEntryGate(input: {
   const multiple = moveMultiple(opportunity)
   const isVt = opportunity.source === 'VT_MARKETS_MT5_DEMO'
   const isCrypto = opportunity.source === 'BINANCE_REALTIME' || opportunity.assetClass === 'CRYPTO_CFD'
+  const eliteLiveVtSetup = isVt
+    && opportunity.setupConfirmed
+    && opportunity.setupStatus === 'CONFIRMED'
+    && opportunity.quote?.feedType === 'BROKER_DEMO_REALTIME'
+    && candleSignal(opportunity) !== 'BLOCKS_ENTRY'
+    && candleScore(opportunity) >= 72
+    && score >= 95
+    && cfdScore >= 92
+    && expected >= target * 1.75
+    && (opportunity.riskReward ?? 0) >= 2
   const exceptionalReversal = score >= 96
     && cfdScore >= 94
     && multiple >= 2.5
     && (opportunity.edgePersistence ?? 0) >= 0.78
     && (opportunity.edgeEfficiency ?? 0) >= 0.65
+    || eliteLiveVtSetup
 
   if (marginWatch && input.openPositions.length >= 3) {
     reasons.push(`margin watch: ${input.account.marginLevel.toFixed(0)}% con ${input.openPositions.length} posiciones; no crecer hasta liberar aire`)
@@ -101,7 +124,7 @@ export function validateTraderEntryGate(input: {
     if (multiple < 2) reasons.push(`anti-bad-entry: movimiento ${multiple.toFixed(2)}x < 2.00x requerido`)
   }
 
-  if (repairMode) {
+  if (repairMode && !eliteLiveVtSetup) {
     const minScore = isCrypto ? 86 : 90
     const minCfdScore = isCrypto ? 87 : 88
     const minExpected = isCrypto ? target * 1.3 : target * 1.7
@@ -114,16 +137,16 @@ export function validateTraderEntryGate(input: {
   }
 
   if (isVt) {
-    const minPersistence = repairMode ? 0.68 : 0.5
-    const minEfficiency = repairMode ? 0.5 : 0.22
-    const minMoveMultiple = repairMode ? 1.8 : 1.1
+    const minPersistence = repairMode && !eliteLiveVtSetup ? 0.68 : 0.5
+    const minEfficiency = repairMode && !eliteLiveVtSetup ? 0.5 : 0.22
+    const minMoveMultiple = repairMode && !eliteLiveVtSetup ? 1.8 : 1.1
     if ((opportunity.edgePersistence ?? 0) < minPersistence) reasons.push(`persistencia ${(((opportunity.edgePersistence ?? 0) * 100)).toFixed(0)}% < ${(minPersistence * 100).toFixed(0)}%`)
     if ((opportunity.edgeEfficiency ?? 0) < minEfficiency) reasons.push(`eficiencia ${(((opportunity.edgeEfficiency ?? 0) * 100)).toFixed(0)}% < ${(minEfficiency * 100).toFixed(0)}%`)
     if (multiple < minMoveMultiple) reasons.push(`movimiento ${multiple.toFixed(2)}x < ${minMoveMultiple.toFixed(2)}x`)
   }
 
   if (sameAssetClassOpen >= 3 && score < 92) reasons.push(`ya hay ${sameAssetClassOpen} posiciones de ${opportunity.assetClass}; exigir score >= 92`)
-  if (correlatedUsd && repairMode) reasons.push('skill repair: evitar otra exposicion USD correlacionada en la misma direccion')
+  if (correlatedUsd && repairMode && !eliteLiveVtSetup) reasons.push('skill repair: evitar otra exposicion USD correlacionada en la misma direccion')
 
   return {
     approved: reasons.length === 0,

@@ -46,15 +46,41 @@ function candleSignal(opportunity: Opportunity) {
   return null
 }
 
+function hasLivePaperFeed(opportunity: Opportunity) {
+  const feedType = opportunity.quote?.feedType
+  return feedType === 'BROKER_DEMO_REALTIME' || feedType === 'REALTIME_TICK'
+}
+
+function hasConfirmedSetup(opportunity: Opportunity) {
+  return opportunity.setupConfirmed
+    || opportunity.setupStatus === 'CONFIRMED'
+    || opportunity.setupStatus === 'EDGE_CONFIRMED'
+    || opportunity.setupStatus === 'CONTROLLED_PROBE'
+    || opportunity.setupStatus === 'LEARNING_ESCAPE_PROBE'
+}
+
 function isExceptionalEnoughToRetry(opportunity: Opportunity) {
   const isCrypto = opportunity.source === 'BINANCE_REALTIME' || opportunity.assetClass === 'CRYPTO_CFD'
   const score = opportunity.opportunityScore ?? 0
   const cfdScore = opportunity.cfdExpertScore ?? 0
+  const signal = candleSignal(opportunity)
+  const candleAllowsEntry = signal !== 'BLOCKS_ENTRY'
+  const eliteLiveSetup = hasLivePaperFeed(opportunity)
+    && hasConfirmedSetup(opportunity)
+    && candleAllowsEntry
+    && score >= 95
+    && cfdScore >= 92
+    && (opportunity.expectedNetProfit ?? 0) >= 3.5
+    && (opportunity.riskReward ?? 0) >= 2
+    && candleScore(opportunity) >= 72
+
+  if (eliteLiveSetup) return true
+
   if (isCrypto) {
     return score >= 97
       && cfdScore >= 94
       && candleScore(opportunity) >= 78
-      && candleSignal(opportunity) === 'CONFIRMS_ENTRY'
+      && signal === 'CONFIRMS_ENTRY'
   }
   return score >= 96
     && cfdScore >= 93
@@ -148,7 +174,7 @@ export function validateLossPatternFirewall(input: {
 
   return {
     approved: true,
-    reason: `Loss pattern firewall permite ${input.opportunity.cfdSymbol}: setup excepcional suficientemente distinto al patron perdedor.`,
+    reason: `Loss pattern firewall permite ${input.opportunity.cfdSymbol}: entrada elite con feed vivo, setup confirmado y edge suficiente pese al patron perdedor previo.`,
     status,
   }
 }

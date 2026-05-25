@@ -31,9 +31,9 @@ import { evaluateAccountHealth, type AccountHealthState } from '../risk/accountH
 import { multiPositionLimits } from '../risk/multiPositionPortfolioPolicy.js'
 import { scanGlobalOpportunities, type Opportunity } from '../strategy/globalOpportunityScanner.js'
 import { buildControlledProbeOpportunity } from '../strategy/controlledProbePolicy.js'
-import { getPaperAccountBase, reconcilePaperAccountFromClosedPnl } from '../storage/paperAccountStore.js'
+import { getPaperAccountBase, reconcilePaperAccountFromClosedPnl, resetPaperAccountForDiagnostics } from '../storage/paperAccountStore.js'
 import { applyClosedPnl } from '../storage/paperAccountStore.js'
-import { closePosition, getClosedTrades, getOpenPositions, getTradeJournalIntegrity } from '../storage/tradeStore.js'
+import { closePosition, getClosedTrades, getOpenPositions, getTradeJournalIntegrity, resetPaperTradeStoreForFreshStart } from '../storage/tradeStore.js'
 import { getAccount as getVtAccount, getSymbols as getVtSymbols, getVtMarketsStatus } from '../broker/vtMarketsConnector.js'
 
 export const cfdPaperRouter = Router()
@@ -825,6 +825,26 @@ cfdPaperRouter.post('/activate-recovery-probe', (_request, response) => {
   lastDecision = { decision: 'RECOVERY_PROBE_MODE', mode: 'RECOVERY_PROBE_MODE', reason: 'Entradas paper limitadas para medir edge sin modo agresivo.' }
   pushActivity({ action: 'RECOVERY_PROBE_ON', reason: 'Modo intermedio activado: risk $10, entradas limitadas, gating mas inteligente y sin dinero real.' })
   response.json({ ok: true, defensiveDiagnostic: getDefensiveDiagnosticMode(accountSnapshot()), realTradingAllowed: false, brokerExecutionEnabled: false })
+})
+
+cfdPaperRouter.post('/reset-paper-account', async (_request, response) => {
+  const reset = resetPaperTradeStoreForFreshStart('Cuenta paper reiniciada para medir una sesion limpia.')
+  const account = resetPaperAccountForDiagnostics()
+  lastBlocked = []
+  lastEffectivenessStatus = null
+  lastLearningSignature = null
+  lastDecision = { decision: 'FRESH_PAPER_START', reason: 'Cuenta paper limpia: balance 2500, sin perdidas heredadas y sin posiciones abiertas.' }
+  activityFeed.splice(0, activityFeed.length)
+  pushActivity({ action: 'PAPER_ACCOUNT_RESET', reason: 'Cuenta paper reiniciada con backup del journal anterior. Balance limpio $2500.00.' })
+  response.json({
+    ok: true,
+    account,
+    brokerExecutionEnabled: false,
+    paperOnly: true,
+    realTradingAllowed: false,
+    reset,
+    status: await statusPayload(),
+  })
 })
 
 cfdPaperRouter.post('/run-research-learning', async (_request, response) => {

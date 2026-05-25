@@ -107,4 +107,62 @@ const exceptional = validateLossPatternFirewall({
 })
 assert(exceptional.approved, exceptional.reason)
 
+const eliteVtOpportunity: Opportunity = {
+  assetClass: 'INDEX_CFD',
+  candleBehavior: { signal: 'CONFIRMS_ENTRY', score: 76 },
+  cfdExpertScore: 94,
+  cfdSymbol: 'US500.cfd',
+  decision: 'APPROVED',
+  direction: 'LONG',
+  edgeEfficiency: 0.32,
+  edgeMoveBps: 2,
+  edgePersistence: 0.69,
+  edgeRequiredMoveBps: 0.9,
+  expectedNetProfit: 3.92,
+  opportunityScore: 96,
+  quote: {
+    ask: 5230.2,
+    bid: 5230,
+    cfdSymbol: 'US500.cfd',
+    feedType: 'BROKER_DEMO_REALTIME',
+    lastPriceUpdate: new Date().toISOString(),
+    mid: 5230.1,
+    pricingQuality: 'LIVE_BID_ASK',
+    provider: 'VT Markets MT5 Demo',
+    sourcePrice: {
+      asset: 'US500.cfd',
+      change: 1,
+      changePercent: 0.02,
+      feedType: 'BROKER_DEMO_REALTIME',
+      isDynamicPriceAvailable: true,
+      lastPriceUpdate: new Date().toISOString(),
+      mappedSymbol: 'US500',
+      message: 'test',
+      previousPrice: 5229,
+      price: 5230.1,
+      provider: 'VT Markets MT5 Demo',
+      validForPaperPositionTracking: true,
+      validForScalping: false,
+    },
+    spread: 0.2,
+    spreadBps: 0.38,
+    underlyingSymbol: 'US500',
+  },
+  reason: 'VT elite setup',
+  riskReward: 2.1,
+  setupConfirmed: true,
+  setupStatus: 'CONFIRMED',
+  source: 'VT_MARKETS_MT5_DEMO',
+  strategy: 'PullbackContinuation',
+  timeframe: 'INTRADAY_SLOW',
+  underlyingSymbol: 'US500',
+}
+
+const eliteVtAllowed = validateLossPatternFirewall({
+  attribution: { ...attribution, worstStrategies: [{ name: 'PullbackContinuation', netPnl: -3.68, trades: 6 }] },
+  effectiveness: { ...baseEffectiveness, principalClosureReason: 'THESIS_INVALIDATED', targetHitsToday: 2 },
+  opportunity: eliteVtOpportunity,
+})
+assert(eliteVtAllowed.approved, eliteVtAllowed.reason)
+
 done('loss-pattern-firewall')

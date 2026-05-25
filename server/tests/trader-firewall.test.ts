@@ -72,6 +72,23 @@ function position(symbol: string): CfdPosition {
 function opportunity(symbol = 'EURUSD.cfd', overrides: Partial<Opportunity> = {}): Opportunity {
   return {
     assetClass: 'FOREX_CFD',
+    candleBehavior: {
+      available: true,
+      bodyRatio: 0.55,
+      breakoutConfirmed: true,
+      candlesUsed: 6,
+      directionAligned: true,
+      exhaustionAgainst: false,
+      pattern: 'CLOSE_BREAKOUT',
+      reason: 'Vela cerrada confirma direccion.',
+      rejectionConfirmed: false,
+      score: 82,
+      signal: 'CONFIRMS_ENTRY',
+      timeframe: '1m',
+      trendAligned: true,
+    },
+    candleBehaviorScore: 82,
+    candlePattern: 'CLOSE_BREAKOUT',
     cfdExpertScore: 93,
     cfdSymbol: symbol,
     decision: 'APPROVED',

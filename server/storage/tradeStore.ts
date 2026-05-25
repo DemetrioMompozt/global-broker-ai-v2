@@ -150,6 +150,36 @@ export function getTradeJournalIntegrity() {
   }
 }
 
+export function resetPaperTradeStoreForFreshStart(reason = 'fresh paper start') {
+  let backupPath: string | null = null
+  try {
+    if (!journalDisabled) {
+      if (!fs.existsSync(journalDir)) fs.mkdirSync(journalDir, { recursive: true })
+      if (fs.existsSync(journalPath)) {
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+        backupPath = `${journalPath}.fresh-start-${stamp}.bak`
+        fs.copyFileSync(journalPath, backupPath)
+      }
+    }
+  } catch {
+    backupPath = null
+  }
+
+  openPositions.splice(0, openPositions.length)
+  closedTrades.splice(0, closedTrades.length)
+  persistClosedTrades()
+  journalIntegrity.lastBackupPath = backupPath
+  journalIntegrity.lastRepairAt = new Date().toISOString()
+
+  return {
+    backupPath,
+    closedTrades: closedTrades.length,
+    journalPath,
+    openPositions: openPositions.length,
+    reason,
+  }
+}
+
 export function addOpenPosition(position: CfdPosition) {
   openPositions.push(position)
 }

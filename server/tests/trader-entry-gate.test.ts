@@ -86,6 +86,37 @@ const weak = validateTraderEntryGate({
 })
 assert(!weak.approved && weak.reason.includes('skill repair'), 'Weak recent performance must require sniper-quality entries.')
 
+const eliteVt = validateTraderEntryGate({
+  account,
+  effectiveness: weakEffectiveness,
+  openPositions: [],
+  opportunity: {
+    ...baseOpportunity,
+    assetClass: 'INDEX_CFD',
+    cfdExpertScore: 94,
+    cfdSymbol: 'US500.cfd',
+    edgeEfficiency: 0.32,
+    edgeMoveBps: 2,
+    edgePersistence: 0.69,
+    edgeRequiredMoveBps: 0.9,
+    expectedNetProfit: 3.92,
+    opportunityScore: 96,
+    quote: {
+      ...quote,
+      ask: 5230.2,
+      bid: 5230,
+      cfdSymbol: 'US500.cfd',
+      mid: 5230.1,
+      spread: 0.2,
+      spreadBps: 0.38,
+      underlyingSymbol: 'US500',
+    },
+    strategy: 'PullbackContinuation',
+    underlyingSymbol: 'US500',
+  },
+})
+assert(eliteVt.approved, eliteVt.reason)
+
 const marginLocked = validateTraderEntryGate({
   account: { ...account, freeMargin: 200, marginLevel: 130 },
   effectiveness: weakEffectiveness,
