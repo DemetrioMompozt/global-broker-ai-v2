@@ -37,9 +37,9 @@ export function evaluateCfdProfessionalSkill(input: {
   const projectedUsedMargin = input.account.usedMargin + input.marginRequired
   const projectedFreeMargin = input.account.equity - projectedUsedMargin
   const projectedMarginLevel = projectedUsedMargin > 0 ? input.account.equity / projectedUsedMargin * 100 : 9999
-  const netTargetFeasible = input.expectedNetProfit >= input.targetNetUsd - 0.01
+  const netTargetFeasible = input.expectedNetProfit >= input.targetNetUsd - 0.001
   const maxMarginShare = {
-    CRYPTO_CFD: 0.45,
+    CRYPTO_CFD: 0.55,
     EQUITY_CFD: 0.35,
     FOREX_CFD: 0.32,
     INDEX_CFD: 0.38,
