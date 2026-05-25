@@ -358,3 +358,42 @@ export function getWeekendLearningCampaignStatus() {
     },
   }
 }
+
+export function getShadowLearningEvidenceFor(input: {
+  cfdSymbol: string
+  direction?: 'LONG' | 'SHORT'
+  strategy?: string
+}) {
+  const symbolSamples = state.closedSamples.filter((sample) => sample.cfdSymbol === input.cfdSymbol)
+  const comparableSamples = symbolSamples.filter((sample) => {
+    if (input.direction && sample.direction !== input.direction) return false
+    if (input.strategy && sample.strategy !== input.strategy) return false
+    return true
+  })
+  const samples = comparableSamples.length >= 3 ? comparableSamples : symbolSamples
+  const wins = samples.filter((sample) => sample.netPnl > 0)
+  const losses = samples.filter((sample) => sample.netPnl < 0)
+  const targetHits = samples.filter((sample) => sample.exitReason === 'TARGET_2_USD')
+  const netPnl = samples.reduce((sum, sample) => sum + sample.netPnl, 0)
+  const expectedPayoff = samples.length ? netPnl / samples.length : 0
+  const winRate = samples.length ? wins.length / samples.length * 100 : 0
+  const targetHitRate = samples.length ? targetHits.length / samples.length * 100 : 0
+  const averageLoss = losses.length
+    ? Math.abs(losses.reduce((sum, sample) => sum + sample.netPnl, 0)) / losses.length
+    : 0
+  const averageWin = wins.length
+    ? wins.reduce((sum, sample) => sum + sample.netPnl, 0) / wins.length
+    : 0
+  return {
+    averageLoss: Number(averageLoss.toFixed(4)),
+    averageWin: Number(averageWin.toFixed(4)),
+    comparableSamples: comparableSamples.length,
+    expectedPayoff: Number(expectedPayoff.toFixed(4)),
+    netPnl: Number(netPnl.toFixed(4)),
+    samples: samples.length,
+    symbolSamples: symbolSamples.length,
+    targetHitRate: Number(targetHitRate.toFixed(2)),
+    targetHits: targetHits.length,
+    winRate: Number(winRate.toFixed(2)),
+  }
+}

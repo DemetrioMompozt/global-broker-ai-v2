@@ -11,6 +11,7 @@ import { updateOpenPositions } from '../cfd/cfdPositionManager.js'
 import { minimumRotationHoldSeconds, reviewOpenPositions, type RotationDecision } from '../cfd/positionRotationEngine.js'
 import { getLastCfdExpertEvaluation } from '../cfd/cfdExpertAgent.js'
 import { getFeedStatuses } from '../feeds/livePriceService.js'
+import { getMarketNewsIntelligence, validateMarketNewsForOpportunity } from '../intelligence/marketNewsIntelligence.js'
 import { buildAdaptiveLearning } from '../performance/adaptiveLearningEngine.js'
 import { getCfdResearchLearningStatus, maybeRunCfdResearchLearning, runCfdResearchLearningNow } from '../performance/cfdResearchLearningAgent.js'
 import { getProfessionalTradingLibrarySkillStatus } from '../learning/professionalTradingLibrarySkill.js'
@@ -25,6 +26,7 @@ import { buildNoPositionWatchdog } from '../ops/noPositionWatchdog.js'
 import { getKillSwitchStatus } from '../risk/killSwitch.js'
 import { getPerformanceGuardStatus } from '../risk/performanceGuard.js'
 import { isRecoveryMode, validateRecoveryCandidate } from '../risk/effectivenessRecoveryGuard.js'
+import { validateEvidenceFirstMainPaperGate } from '../risk/evidenceFirstMainPaperGate.js'
 import { buildLossPatternFirewallStatus, validateLossPatternFirewall } from '../risk/lossPatternFirewall.js'
 import { activateDefensiveDiagnosticMode, activateRecoveryProbeMode, getDefensiveDiagnosticMode } from '../risk/defensiveDiagnosticMode.js'
 import { evaluateAccountHealth, type AccountHealthState } from '../risk/accountHealthGuard.js'
@@ -340,6 +342,7 @@ async function evaluateAgentCycle() {
   }
   emitEffectivenessEvents(effectiveness, account)
   const adaptiveLearning = buildAdaptiveLearning()
+  const marketNews = await getMarketNewsIntelligence()
   const researchLearning = maybeRunCfdResearchLearning('agent-cycle')
   if (researchLearning.lastRunAt && researchLearning.lastRunAt !== lastResearchLearningRunAt) {
     lastResearchLearningRunAt = researchLearning.lastRunAt
@@ -527,6 +530,37 @@ async function evaluateAgentCycle() {
         })
         continue
       }
+      const newsGate = validateMarketNewsForOpportunity({ intelligence: marketNews, opportunity })
+      if (!newsGate.approved) {
+        recoveryBlocked.push({ cfdSymbol: opportunity.cfdSymbol, reason: newsGate.reason })
+        pushActivity({
+          action: 'NEWS_RISK_BLOCK',
+          symbol: opportunity.cfdSymbol,
+          reason: `${newsGate.reason} El agente espera confirmacion adicional antes de tocar balance paper.`,
+        })
+        continue
+      }
+      const evidenceGate = watchdogPressure
+        ? {
+          active: true,
+          approved: false,
+          reason: 'Evidence gate bloquea watchdog: despues de perdidas, el sistema no fuerza entradas main paper sin evidencia positiva.',
+          shadowLearningRecommended: true,
+        }
+        : validateEvidenceFirstMainPaperGate({
+          attribution: cycleLossAttribution,
+          effectiveness,
+          opportunity,
+        })
+      if (!evidenceGate.approved) {
+        recoveryBlocked.push({ cfdSymbol: opportunity.cfdSymbol, reason: evidenceGate.reason })
+        pushActivity({
+          action: 'MAIN_PAPER_EVIDENCE_GATE',
+          symbol: opportunity.cfdSymbol,
+          reason: `${evidenceGate.reason} El aprendizaje shadow sigue corriendo sin tocar balance.`,
+        })
+        continue
+      }
       const traderGate = watchdogPressure
         ? { approved: true, reason: 'No-position watchdog aprueba presión controlada: el sistema sano no debe quedarse quieto.', repairMode: false }
         : validateTraderEntryGate({ account, effectiveness, openPositions: getOpenPositions(), opportunity })
@@ -659,6 +693,7 @@ async function statusPayload() {
   const leverageDamage = buildLeverageDamage()
   const adaptiveLearning = buildAdaptiveLearning()
   const cfdResearchLearning = getCfdResearchLearningStatus()
+  const marketNews = await getMarketNewsIntelligence()
   const professionalTradingLibrarySkill = getProfessionalTradingLibrarySkillStatus()
   const learningCampaign = getWeekendLearningCampaignStatus()
   const cfdTraderSkill = buildCfdTraderSkillReadout({
@@ -687,6 +722,13 @@ async function statusPayload() {
     openPositions,
     opportunities: lastOpportunities,
   })
+  const mainPaperEvidenceGate = lastOpportunities[0]
+    ? validateEvidenceFirstMainPaperGate({
+      attribution: lossAttribution,
+      effectiveness: agentEffectiveness,
+      opportunity: lastOpportunities[0],
+    })
+    : null
   return {
     mode: defensiveDiagnostic.mode === 'RECOVERY_PROBE_MODE'
       ? 'RECOVERY_PROBE_MODE'
@@ -766,9 +808,11 @@ async function statusPayload() {
     defensiveDiagnostic,
     lossAttribution,
     lossPatternFirewall,
+    mainPaperEvidenceGate,
     targetFeasibility,
     leverageDamage,
     adaptiveLearning,
+    marketNews,
     cfdResearchLearning,
     professionalTradingLibrarySkill,
     learningCampaign,

@@ -64,9 +64,11 @@ export type CfdPaperStatus = {
   defensiveDiagnostic: DefensiveDiagnosticStatus
   lossAttribution: LossAttributionStatus
   lossPatternFirewall: LossPatternFirewallStatus
+  mainPaperEvidenceGate?: MainPaperEvidenceGateStatus | null
   targetFeasibility: TargetFeasibilityStatus
   leverageDamage: LeverageDamageStatus
   adaptiveLearning: AdaptiveLearningStatus
+  marketNews: MarketNewsStatus
   cfdResearchLearning: CfdResearchLearningStatus
   professionalTradingLibrarySkill: ProfessionalTradingLibrarySkillStatus
   learningCampaign: LearningCampaignStatus
@@ -447,6 +449,45 @@ export type LossPatternFirewallStatus = {
   reason: string
   mainPaperAllowed: boolean
   shadowLearningRecommended: boolean
+}
+
+export type MainPaperEvidenceGateStatus = {
+  active: boolean
+  approved: boolean
+  reason: string
+  shadowLearningRecommended: boolean
+  evidence?: {
+    averageLoss: number
+    averageWin: number
+    comparableSamples: number
+    expectedPayoff: number
+    netPnl: number
+    samples: number
+    symbolSamples: number
+    targetHitRate: number
+    targetHits: number
+    winRate: number
+  }
+}
+
+export type MarketNewsStatus = {
+  enabled: true
+  status: 'READY' | 'STALE' | 'ERROR'
+  lastUpdatedAt: string | null
+  nextUpdateAt: string | null
+  globalRisk: 'LOW' | 'MEDIUM' | 'HIGH'
+  summary: string
+  topEvents: Array<{
+    affectedMarkets: string[]
+    impact: 'LOW' | 'MEDIUM' | 'HIGH'
+    publishedAt: string
+    reason: string
+    source: string
+    title: string
+    url: string
+  }>
+  sources: Array<{ name: string; status: 'OK' | 'ERROR'; url: string }>
+  error?: string
 }
 
 export type CfdTraderSkillStatus = {

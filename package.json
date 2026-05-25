@@ -39,6 +39,8 @@
     "test:no-position-watchdog": "tsx server/tests/no-position-watchdog.test.ts",
     "test:never-stop-paper": "tsx server/tests/never-stop-paper.test.ts",
     "test:loss-pattern-firewall": "tsx server/tests/loss-pattern-firewall.test.ts",
+    "test:evidence-first-gate": "tsx server/tests/evidence-first-main-paper-gate.test.ts",
+    "test:market-news": "tsx server/tests/market-news-intelligence.test.ts",
     "test:cfd-research-learning": "tsx server/tests/cfd-research-learning.test.ts",
     "test:professional-trading-library": "tsx server/tests/professional-trading-library-skill.test.ts",
     "test:crypto-candle-integrity": "tsx server/tests/crypto-candle-integrity.test.ts",

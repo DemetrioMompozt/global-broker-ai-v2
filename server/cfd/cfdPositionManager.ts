@@ -87,9 +87,10 @@ export async function updateOpenPositions() {
     const givebackProtection = Boolean(bestOpenPnl >= 1.1 && netPnl <= -0.15 && ageSeconds >= 45)
     const cryptoFastInvalidated = position.assetClass === 'CRYPTO_CFD' && ageSeconds >= 75 && netPnl <= -1
     const microTimeStop = ageSeconds >= microProfitConfig.maxHoldSeconds
+    const microTimeStopProfit = microTimeStop && netPnl >= Math.max(0.25, microTargetNetUsd * 0.15)
     const stopHit = position.direction === 'LONG' ? currentPrice <= position.stopLoss : currentPrice >= position.stopLoss
     const tpHit = position.direction === 'LONG' ? currentPrice >= position.takeProfit : currentPrice <= position.takeProfit
-    if (microTarget.close || vtThesisInvalidated || vtThesisLost || traderSkillCutLoser || givebackProtection || cryptoFastInvalidated || microTimeStop || maxLossHit || stopHit || tpHit) {
+    if (microTarget.close || vtThesisInvalidated || vtThesisLost || traderSkillCutLoser || givebackProtection || cryptoFastInvalidated || microTimeStopProfit || maxLossHit || stopHit || tpHit) {
       const exitReason = microTarget.close
         ? 'MICRO_CLOSE_TARGET'
         : vtThesisInvalidated
@@ -102,8 +103,8 @@ export async function updateOpenPositions() {
             ? 'TRADER_SKILL_GIVEBACK_PROTECTION'
           : cryptoFastInvalidated
             ? 'CRYPTO_FAST_INVALIDATION'
-          : microTimeStop
-            ? 'MICRO_TIME_STOP'
+          : microTimeStopProfit
+            ? 'MICRO_TIME_STOP_PROFIT'
             : maxLossHit ? 'MICRO_MAX_LOSS' : stopHit ? 'STOP_LOSS' : 'TAKE_PROFIT'
       const trade = closePosition(position.id, currentPrice, exitReason, netPnl, openPnl)
       if (trade) {
@@ -112,7 +113,13 @@ export async function updateOpenPositions() {
         closed.push(trade)
       }
     } else {
-      updated.push(next)
+      updated.push(microTimeStop && netPnl < 0
+        ? {
+          ...next,
+          managementStatus: 'TIME_STOP_HOLDING_FOR_BETTER_EXIT',
+          nextAction: 'WAIT_BETTER_EXIT',
+        }
+        : next)
     }
   }
   replaceOpenPositions(updated)

@@ -20,6 +20,7 @@ import { DefensiveDiagnosticMode } from './components/dashboard/DefensiveDiagnos
 import { LossAttributionPanel } from './components/dashboard/LossAttributionPanel'
 import { LossPatternFirewallPanel } from './components/dashboard/LossPatternFirewallPanel'
 import { AgentLearningPanel } from './components/dashboard/AgentLearningPanel'
+import { MarketNewsIntelligence } from './components/dashboard/MarketNewsIntelligence'
 import { CFDResearchLearningPanel } from './components/dashboard/CFDResearchLearningPanel'
 import { ProfessionalTradingLibraryPanel } from './components/dashboard/ProfessionalTradingLibraryPanel'
 import { LearningCampaignMonitor } from './components/dashboard/LearningCampaignMonitor'
@@ -45,6 +46,7 @@ export default function App() {
       <ProfessionalSystemAudit audit={status.professionalAudit} watchdog={status.noPositionWatchdog} />
       <DefensiveDiagnosticMode diagnostic={status.defensiveDiagnostic} />
       <AgentLearningPanel learning={status.adaptiveLearning} />
+      <MarketNewsIntelligence news={status.marketNews} />
       <ProfessionalTradingLibraryPanel library={status.professionalTradingLibrarySkill} />
       <CFDResearchLearningPanel learning={status.cfdResearchLearning} />
       <LearningCampaignMonitor campaign={status.learningCampaign} />
