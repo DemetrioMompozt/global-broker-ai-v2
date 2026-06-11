@@ -50,3 +50,19 @@ deploy-*.png
 deploy-*.jpg
 deploy-*.jpeg
 deploy-*.webp
+# AWS / SSM / remote session outputs and sensitive operation params
+aws-*.json
+aws-status-*.json
+aws-trade-journal-*.json
+aws-trader-workspace-*.json
+aws-v4-*.json
+ssm-*.json
+ssm-*.txt
+*presigned*.txt
+*presigned*.json
+remote-*.json
+remote-*.txt
+remote-*.log
+*-remote-*.ps1
+*stdout.txt
+*stderr.txt
