@@ -20,3 +20,33 @@ vite-v2.err.log
 deploy-package/
 global-broker-ai-v2-deploy.zip
 global-broker-ai-v2-render-ready.zip
+
+# Codex / deployment / session generated artifacts
+tmp*/
+tmp-*/
+video_analysis_*/
+rdp-*/
+deploy-package/
+deploy-*.zip
+deploy-*.rdp
+*.rdp
+*.tmp
+*.tar
+*.gz
+*.7z
+*.out.log
+*.err.log
+
+# Generated operation screenshots/artifacts with known prefixes
+aws-*.png
+aws-*.jpg
+aws-*.jpeg
+aws-*.webp
+ssm-*.png
+ssm-*.jpg
+ssm-*.jpeg
+ssm-*.webp
+deploy-*.png
+deploy-*.jpg
+deploy-*.jpeg
+deploy-*.webp
